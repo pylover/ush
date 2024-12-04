@@ -1,0 +1,4 @@
+version: "0.1.0"
+description: "VIM hotkey supported with UART"
+url: "https://github.com/pylover/ush"
+license: "MIT"

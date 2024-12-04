@@ -1,0 +1,9 @@
+menu "ush"
+	config USH_HISTORY_MASK
+		int "ush history mask (buffer size - 1)."
+        default 7
+	
+	config USH_CMDLINE_MAX
+		int "ush command line buffer size"
+        default 256
+endmenu
