@@ -3,18 +3,31 @@
 
 
 #include <euart.h>
+#include <uaio.h>
+
+
+typedef struct ush_process {
+    int argc;
+    char **argv;
+    void *userptr;
+} ush_process_t;
+
+
+#undef UAIO_ARG1
+#undef UAIO_ARG2
+#undef UAIO_ENTITY
+#define UAIO_ENTITY ush_process
+#include "uaio_generic.h"
 
 
 #define USH_DEBUG(s, fmt, ...) \
-    EUART_PRINTF(&(s)->debug, fmt"\n", ## __VA_ARGS__)
-
-
-typedef int (*ush_entrypoint_t) (int argc, char *argv[0]);;
+    EUART_PRINTF(&(s)->debug, "[%c] "fmt"\n", (s)->insertmode? 'I': 'N', \
+    ## __VA_ARGS__)
 
 
 struct ush_command {
     const char *name;
-    ush_entrypoint_t entrypoint;
+    ush_process_coro entrypoint;
 };
 
 
@@ -33,7 +46,9 @@ typedef struct ush {
     struct euart debug;
 
     /* typing */
+#ifdef CONFIG_USH_VIMODE
     bool insertmode;
+#endif
     char currentchar;
     char cmdline[CONFIG_USH_CMDLINE_MAX + 1];
     unsigned int cmdsize;

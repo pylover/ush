@@ -34,6 +34,13 @@ _navA(struct uaio_task *self, struct ush *sh) {
     }
 
     if (sh->currentchar == CHAR_ESCAPE) {
+        USH_DEBUG(sh, "escape");
+#ifdef CONFIG_USH_VIMODE
+        if (sh->insertmode) {
+            USH_DEBUG(sh, "getting normal mode");
+            sh->insertmode = false;
+        }
+#endif
         need = '[';
     }
     else {
@@ -108,6 +115,7 @@ _execA(struct uaio_task *self, struct ush *sh) {
     // TODO: find command
     UAIO_BEGIN(self);
     USH_DEBUG(sh, "executing: %s", sh->cmdline);
+
     if (sh->cmdsize) {
         printf("%.*s\n", sh->cmdsize, sh->cmdline);
     }
@@ -120,7 +128,9 @@ ushA(struct uaio_task *self, struct ush *sh) {
     // int ret;
     UAIO_BEGIN(self);
 
+#ifdef CONFIG_USH_VIMODE
     sh->insertmode = true;
+#endif
     sh->currentchar = 0;
     sh->cmdsize = 0;
     sh->cursor = 0;
@@ -151,6 +161,7 @@ prompt:
             UAIO_AWAIT(self, ush, _navA, sh);
             continue;
         }
+
         // if (sh->insertmode) {
         // }
         // else {

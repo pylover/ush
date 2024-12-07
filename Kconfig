@@ -6,4 +6,9 @@ menu "ush"
 	config USH_CMDLINE_MAX
 		int "ush command line buffer size"
         default 256
+
+	config USH_VIMODE
+		bool "vi editing moe"
+		default y
+
 endmenu
