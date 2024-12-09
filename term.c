@@ -1,5 +1,7 @@
 #include <stdarg.h>
 
+#include <elog.h>
+
 #include "term.h"
 #include "char.h"
 
@@ -18,17 +20,57 @@ term_overwrite(struct ush *sh, const char *restrict fmt, ...) {
 
 
 void
+term_delete(struct ush *sh) {
+    /*
+     *   buff       term
+     *   01234567   01234567
+     * 1 abcdefgh   abcdefgh
+     *       ^          ^
+     * 2 abcdfgh    abcdefgh
+     *       ^          ^
+     *
+     */
+    if (!sh->cursor) {
+        return;
+    }
+
+    DEBUG("delete: cursor: %d", sh->cursor);
+
+    // (1)
+    putchar(127);
+    putchar(0x7f);
+
+    // // (3)
+    // for (int i = sh->cursor; i < sh->cmdsize; i++) {
+    //     sh->cmdline[i - 1] = sh->cmdline[i];
+    // }
+    // sh->cursor--;
+    // sh->cmdsize--;
+
+    // // (4)
+    // int curoff = sh->cmdsize - sh->cursor;
+    // if (curoff) {
+    //     term_overwrite(sh, "%.*s", curoff, sh->cmdline + sh->cursor);
+    // }
+    // printf(" \b");
+    // term_navleft(sh, curoff);
+}
+
+
+void
 term_backspace(struct ush *sh) {
-    //   buff       term
-    //   01234567   01234567
-    // 1 abcdefgh   abcdefgh
-    //       ^          ^
-    // 2 abcdefgh   abc efgh
-    //       ^         ^
-    // 3 abcefgh    abc efgh
-    //      ^          ^
-    // 4 abcefgh    abcefgh
-    //          ^          ^
+    /*
+     *   buff       term
+     *   01234567   01234567
+     * 1 abcdefgh   abcdefgh
+     *       ^          ^
+     * 2 abcdefgh   abc efgh
+     *       ^         ^
+     * 3 abcefgh    abc efgh
+     *      ^          ^
+     * 4 abcefgh    abcefgh
+     *          ^          ^
+     */
     if (!sh->cursor) {
         return;
     }

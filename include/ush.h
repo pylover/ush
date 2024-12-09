@@ -20,14 +20,9 @@ typedef struct ush_process {
 #include "uaio_generic.h"
 
 
-#define USH_DEBUG(s, fmt, ...) \
-    EUART_PRINTF(&(s)->debug, "[%c] "fmt"\n", (s)->insertmode? 'I': 'N', \
-    ## __VA_ARGS__)
-
-
 struct ush_command {
     const char *name;
-    ush_process_coro entrypoint;
+    ush_process_coro_t entrypoint;
 };
 
 
@@ -41,9 +36,6 @@ struct ush_history {
 typedef struct ush {
     /* console */
     struct euart console;
-
-    /* debug */
-    struct euart debug;
 
     /* typing */
 #ifdef CONFIG_USH_VIMODE

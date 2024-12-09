@@ -10,6 +10,10 @@ term_print(struct ush *sh, const char *restrict fmt, ...);
 
 
 void
+term_delete(struct ush *sh);
+
+
+void
 term_backspace(struct ush *sh);
 
 

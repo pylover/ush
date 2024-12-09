@@ -11,4 +11,5 @@ menu "ush"
 		bool "vi editing moe"
 		default y
 
+	config USH_CMDLINE
 endmenu
