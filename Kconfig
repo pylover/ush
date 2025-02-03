@@ -1,15 +1,35 @@
 menu "ush"
-	config USH_HISTORY_MASK
-		int "ush history mask (buffer size - 1)."
-        default 7
+	config USH_CONSOLE_TIMEOUT_US
+		int "console reader timeout in microseconds."
+		default 1000
 	
-	config USH_CMDLINE_MAX
-		int "ush command line buffer size"
-        default 256
+	config USH_CONSOLE_BUFFMASK_BITS
+		int "console reader storage bits"
+		default 8 
 
-	config USH_VIMODE
-		bool "vi editing moe"
-		default y
+	config USH_CONSOLE_LINESIZE
+		int "console command line max bytes."
+		default 256
 
-	config USH_CMDLINE
+	choice 
+		prompt "linebreak"
+		default USH_LINEBREAK_LF
+
+	config USH_LINEBREAK_LF
+		bool "LF"
+
+	config USH_LINEBREAK_CRLF
+		bool "CRLF"
+		
+	endchoice
+
+	config USH_PROMPT
+		string "shell prompt"
+		default "esp32"
+
+#    config USH_HISTORY_BUFFMASK_BITS
+#		int "history mask bits count, 3 means 2 ^ 3 - 1 = 7, default 7."
+#        default 7
+#	
+
 endmenu

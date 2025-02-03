@@ -96,8 +96,8 @@ term_backspace(struct ush *sh) {
 
 
 void
-term_navleft(struct ush *sh, int c) {
-    if (!sh->cursor) {
+term_navleft(struct ush_cmdline l, int c) {
+    if (!l->cursor) {
         return;
     }
 
@@ -106,7 +106,7 @@ term_navleft(struct ush *sh, int c) {
     }
 
     printf("%c[%dD", CHAR_ESCAPE, c);
-    sh->cursor -= c;
+    l->cursor -= c;
 }
 
 
@@ -151,7 +151,7 @@ term_insert(struct ush *sh, char c) {
 
     if (curoff) {
         term_overwrite(sh, "%.*s", curoff, sh->cmdline + sh->cursor);
-        term_navleft(sh, curoff);
+        term_navleft(&sh->cmdline, curoff);
     }
 
     return 0;
@@ -167,7 +167,7 @@ term_navend(struct ush *sh) {
 void
 term_rewrite(struct ush *sh) {
     if (sh->cursor) {
-        term_navleft(sh, sh->cursor);
+        term_navleft(&sh->cmdline, sh->cursor);
     }
     printf("\33[K");
     term_overwrite(sh, "%.*s", sh->cmdsize, sh->cmdline);

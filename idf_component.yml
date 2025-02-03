@@ -2,13 +2,3 @@ version: "0.1.0"
 description: "VIM hotkey supported with UART"
 url: "https://github.com/pylover/ush"
 license: "MIT"
-
-dependencies:
-  ## Required IDF version
-  idf:
-    version: ">=4.1.0"
-  elog:
-    git: git@github.com:pylover/elog.git
-  euart:
-    path: ../euart
-    # git: git@github.com:pylover/euart.git

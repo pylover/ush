@@ -1,14 +1,14 @@
 set(sources
+  "str.c"
+  "console.c"
   "ush.c"
-  "term.c"
-  "history.c"
 )
 
 
 idf_component_register(
   SRCS "${sources}"
   INCLUDE_DIRS "include"
-  REQUIRES elog uaio euart
+  REQUIRES euart ering
 )
 
 
