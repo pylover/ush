@@ -16,7 +16,7 @@
 
 
 struct ush *
-ush_create(struct euart_device *console, struct ush_command commands[]) {
+ush_create(struct euart_device *console, struct ush_executable commands[]) {
     struct ush *sh = NULL;
 
     if (console == NULL) {

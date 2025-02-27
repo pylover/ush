@@ -36,14 +36,14 @@ typedef struct ush_process {
 
 
 // TODO: rename to ush_executable
-struct ush_command {
+struct ush_executable {
     const char *name;
     ush_process_coro_t entrypoint;
 };
 
 
 struct ush *
-ush_create(struct euart_device *console, struct ush_command commands[]);
+ush_create(struct euart_device *console, struct ush_executable commands[]);
 
 
 int

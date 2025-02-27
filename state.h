@@ -10,7 +10,7 @@ typedef struct ush {
     struct terminal terminal;
 
     /* user provided commands vector */
-    struct ush_command *commands;
+    struct ush_executable *commands;
 } ush_t;
 
 
