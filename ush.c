@@ -3,6 +3,7 @@
 
 #include <elog.h>
 
+#include "config.h"
 #include "ush.h"
 #include "state.h"
 #include "terminal.h"

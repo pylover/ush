@@ -20,27 +20,32 @@ terminal_init(struct terminal *ter, struct euart_device *device) {
         return -1;
     }
 
-    if (euart_reader_init(&ter->reader, device,
-                CONFIG_USH_TERMINAL_BUFFMASK_BITS)) {
+    if (euart_reader_init(&ter->reader, device->infd,
+                CONFIG_USH_TERMINAL_READER_RINGMASK_BITS)) {
         return -1;
     }
 
-    // if (history_init(&ter->reader
+    if (history_init(&ter->history,
+                CONFIG_USH_TERMINAL_HISTORY_RINGMASK_BITS)) {
+        euart_reader_deinit(&ter->reader);
+        return -1;
+    }
+
+    ter->device = device;
     return 0;
 }
 
 
 int
 terminal_deinit(struct terminal *ter) {
+    int ret = 0;
     if (ter == NULL) {
         return -1;
     }
 
-    if (euart_reader_deinit(&ter->reader)) {
-        return -1;
-    }
-
-    return 0;
+    ret |= history_deinit(&ter->history);
+    ret |= euart_reader_deinit(&ter->reader);
+    return ret;
 }
 
 
@@ -50,7 +55,7 @@ terminal_printf(struct terminal *ter, const char *restrict fmt, ...) {
     va_list args;
 
     va_start(args, fmt);
-    ret = vdprintf(ter->reader.device->outfd, fmt, args);
+    ret = vdprintf(ter->device->outfd, fmt, args);
     va_end(args);
     return ret;
 }
@@ -106,7 +111,10 @@ terminal_readA(struct uaio_task *self, struct terminal *ter) {
                 continue;
             }
 
-            write(reader->device->outfd, &c, 1);
+            if (write(ter->device->outfd, &c, 1) == -1) {
+                ERROR("device write, fd: %d", ter->device->outfd);
+                UAIO_THROW(self);
+            }
 
             /* consume the char */
             ERING_SKIP(ring, 1);

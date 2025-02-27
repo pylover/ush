@@ -17,12 +17,12 @@ typedef struct str {
 #include <ering.h>
 
 
-// struct str *
-// str_new(size_t size);
-//
-//
-// void
-// str_dispose(struct str *s);
+int
+str_init(struct str *s, size_t size);
+
+
+void
+str_deinit(struct str *s);
 
 
 #endif  // STR_H_

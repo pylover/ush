@@ -6,13 +6,6 @@
 #include <uaio.h>
 
 
-#ifdef CONFIG_USH_LINEBREAK_LF
-#define LINEBREAK "\n"
-#elif CONFIG_USH_LINEBREAK_CRLF
-#define LINEBREAK "\r\n"
-#endif
-
-
 typedef struct ush ush_t;
 #undef UAIO_ARG1
 #undef UAIO_ARG2

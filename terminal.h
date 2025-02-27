@@ -9,6 +9,7 @@
 
 
 typedef struct terminal {
+    struct euart_device *device;
     struct euart_reader reader;
     struct history history;
 
@@ -31,19 +32,19 @@ typedef struct terminal {
 
 
 int
-terminal_init(struct terminal *c, struct euart_device *device);
+terminal_init(struct terminal *ter, struct euart_device *device);
 
 
 int
-terminal_deinit(struct terminal *c);
+terminal_deinit(struct terminal *ter);
 
 
 int
-terminal_printf(struct terminal *c, const char *restrict fmt, ...);
+terminal_printf(struct terminal *ter, const char *restrict fmt, ...);
 
 
 ASYNC
-terminal_readA(struct uaio_task *self, struct terminal *c);
+terminal_readA(struct uaio_task *self, struct terminal *ter);
 
 
 #endif

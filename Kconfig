@@ -1,17 +1,5 @@
 menu "ush"
-	config USH_TERMINAL_TIMEOUT_US
-		int "terminal reader timeout in microseconds."
-		default 1000
-	
-	config USH_TERMINAL_BUFFMASK_BITS
-		int "terminal reader storage bits"
-		default 8 
-
-	config USH_TERMINAL_LINESIZE
-		int "terminal command line max bytes."
-		default 256
-
-	choice 
+	choice
 		prompt "linebreak"
 		default USH_LINEBREAK_LF
 
@@ -20,16 +8,27 @@ menu "ush"
 
 	config USH_LINEBREAK_CRLF
 		bool "CRLF"
-		
 	endchoice
+	
+	config USH_TERMINAL_READER_RINGMASK_BITS
+		int "terminal reader circular buffer mask bits(aka size!)"
+		default 8 
+
+	config USH_TERMINAL_HISTORY_RINGMASK_BITS
+		int "terminal history circular buffer mask bits(aka size!)"
+		default 5 
+
+	config USH_TERMINAL_LINESIZE
+		int "terminal command line size."
+		default 256
 
 	config USH_PROMPT
 		string "shell prompt"
 		default "esp32"
 
-#    config USH_HISTORY_BUFFMASK_BITS
-#		int "history mask bits count, 3 means 2 ^ 3 - 1 = 7, default 7."
-#        default 7
-#	
-
 endmenu
+
+
+# 	config USH_TERMINAL_READER_TIMEOUT_US
+# 		int "terminal reader timeout in microseconds."
+# 		default 1000
