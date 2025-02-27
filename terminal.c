@@ -15,28 +15,28 @@
 
 
 int
-terminal_init(struct terminal *con, struct euart_device *device) {
-    if ((con == NULL) || (device == NULL)) {
+terminal_init(struct terminal *ter, struct euart_device *device) {
+    if ((ter == NULL) || (device == NULL)) {
         return -1;
     }
 
-    if (euart_reader_init(&con->reader, device,
+    if (euart_reader_init(&ter->reader, device,
                 CONFIG_USH_TERMINAL_BUFFMASK_BITS)) {
         return -1;
     }
 
-    // if (history_init(&con->reader
+    // if (history_init(&ter->reader
     return 0;
 }
 
 
 int
-terminal_deinit(struct terminal *con) {
-    if (con == NULL) {
+terminal_deinit(struct terminal *ter) {
+    if (ter == NULL) {
         return -1;
     }
 
-    if (euart_reader_deinit(&con->reader)) {
+    if (euart_reader_deinit(&ter->reader)) {
         return -1;
     }
 
@@ -45,21 +45,21 @@ terminal_deinit(struct terminal *con) {
 
 
 int
-terminal_printf(struct terminal *con, const char *restrict fmt, ...) {
+terminal_printf(struct terminal *ter, const char *restrict fmt, ...) {
     int ret;
     va_list args;
 
     va_start(args, fmt);
-    ret = vdprintf(con->reader.device->outfd, fmt, args);
+    ret = vdprintf(ter->reader.device->outfd, fmt, args);
     va_end(args);
     return ret;
 }
 
 
 static ASYNC
-_escape(struct uaio_task *self, struct terminal *con) {
+_escape(struct uaio_task *self, struct terminal *ter) {
     char c;
-    struct euart_reader *reader = &con->reader;
+    struct euart_reader *reader = &ter->reader;
     struct u8ring *ring = &reader->ring;
     UAIO_BEGIN(self);
     ERING_SKIP(ring, 1);
@@ -87,22 +87,22 @@ _escape(struct uaio_task *self, struct terminal *con) {
 
 
 ASYNC
-terminal_readA(struct uaio_task *self, struct terminal *con) {
+terminal_readA(struct uaio_task *self, struct terminal *ter) {
     char c;
-    struct euart_reader *reader = &con->reader;
+    struct euart_reader *reader = &ter->reader;
     struct u8ring *ring = &reader->ring;
     UAIO_BEGIN(self);
 
-    con->linesize = 0;
+    ter->linesize = 0;
     while (true) {
-        if (con->linesize >= CONFIG_USH_TERMINAL_LINESIZE) {
+        if (ter->linesize >= CONFIG_USH_TERMINAL_LINESIZE) {
             UAIO_THROW2(self, ENOBUFS);
         }
         while (ERING_USED(ring)) {
             c = ERING_GET(ring);
 
             if (c == ASCII_ESC) {
-                TERMINAL_AWAIT(self, _escape, con);
+                TERMINAL_AWAIT(self, _escape, ter);
                 continue;
             }
 
@@ -114,7 +114,7 @@ terminal_readA(struct uaio_task *self, struct terminal *con) {
             if (c == ASCII_LF) {
                 UAIO_RETURN(self);
             }
-            con->line[con->linesize++] = c;
+            ter->line[ter->linesize++] = c;
         }
         EUART_AREAD(self, reader, 1);
     }

@@ -16,10 +16,10 @@
 
 
 struct ush *
-ush_create(struct euart_device *terminal, struct ush_command commands[]) {
+ush_create(struct euart_device *console, struct ush_command commands[]) {
     struct ush *sh = NULL;
 
-    if (terminal == NULL) {
+    if (console == NULL) {
         return NULL;
     }
 
@@ -28,7 +28,7 @@ ush_create(struct euart_device *terminal, struct ush_command commands[]) {
         return NULL;
     }
 
-    if (terminal_init(&sh->terminal, terminal)) {
+    if (terminal_init(&sh->terminal, console)) {
         goto failed;
     }
 
