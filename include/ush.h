@@ -43,7 +43,7 @@ struct ush_command {
 
 
 struct ush *
-ush_create(struct euart_device *console, struct ush_command commands[]);
+ush_create(struct euart_device *terminal, struct ush_command commands[]);
 
 
 int

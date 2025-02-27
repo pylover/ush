@@ -4,24 +4,24 @@
 
 #include "ascii.h"
 #include "ansi.h"
-#include "console.h"
+#include "terminal.h"
 
 
 #undef UAIO_ARG1
 #undef UAIO_ARG2
 #undef UAIO_ENTITY
-#define UAIO_ENTITY console
+#define UAIO_ENTITY terminal
 #include "uaio_generic.c"
 
 
 int
-console_init(struct console *con, struct euart_device *device) {
+terminal_init(struct terminal *con, struct euart_device *device) {
     if ((con == NULL) || (device == NULL)) {
         return -1;
     }
 
     if (euart_reader_init(&con->reader, device,
-                CONFIG_USH_CONSOLE_BUFFMASK_BITS)) {
+                CONFIG_USH_TERMINAL_BUFFMASK_BITS)) {
         return -1;
     }
 
@@ -31,7 +31,7 @@ console_init(struct console *con, struct euart_device *device) {
 
 
 int
-console_deinit(struct console *con) {
+terminal_deinit(struct terminal *con) {
     if (con == NULL) {
         return -1;
     }
@@ -45,7 +45,7 @@ console_deinit(struct console *con) {
 
 
 int
-console_printf(struct console *con, const char *restrict fmt, ...) {
+terminal_printf(struct terminal *con, const char *restrict fmt, ...) {
     int ret;
     va_list args;
 
@@ -57,7 +57,7 @@ console_printf(struct console *con, const char *restrict fmt, ...) {
 
 
 static ASYNC
-_escape(struct uaio_task *self, struct console *con) {
+_escape(struct uaio_task *self, struct terminal *con) {
     char c;
     struct euart_reader *reader = &con->reader;
     struct u8ring *ring = &reader->ring;
@@ -87,7 +87,7 @@ _escape(struct uaio_task *self, struct console *con) {
 
 
 ASYNC
-console_readA(struct uaio_task *self, struct console *con) {
+terminal_readA(struct uaio_task *self, struct terminal *con) {
     char c;
     struct euart_reader *reader = &con->reader;
     struct u8ring *ring = &reader->ring;
@@ -95,14 +95,14 @@ console_readA(struct uaio_task *self, struct console *con) {
 
     con->linesize = 0;
     while (true) {
-        if (con->linesize >= CONFIG_USH_CONSOLE_LINESIZE) {
+        if (con->linesize >= CONFIG_USH_TERMINAL_LINESIZE) {
             UAIO_THROW2(self, ENOBUFS);
         }
         while (ERING_USED(ring)) {
             c = ERING_GET(ring);
 
             if (c == ASCII_ESC) {
-                CONSOLE_AWAIT(self, _escape, con);
+                TERMINAL_AWAIT(self, _escape, con);
                 continue;
             }
 

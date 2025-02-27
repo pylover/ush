@@ -1,14 +1,14 @@
 menu "ush"
-	config USH_CONSOLE_TIMEOUT_US
-		int "console reader timeout in microseconds."
+	config USH_TERMINAL_TIMEOUT_US
+		int "terminal reader timeout in microseconds."
 		default 1000
 	
-	config USH_CONSOLE_BUFFMASK_BITS
-		int "console reader storage bits"
+	config USH_TERMINAL_BUFFMASK_BITS
+		int "terminal reader storage bits"
 		default 8 
 
-	config USH_CONSOLE_LINESIZE
-		int "console command line max bytes."
+	config USH_TERMINAL_LINESIZE
+		int "terminal command line max bytes."
 		default 256
 
 	choice 

@@ -1,6 +1,6 @@
 set(sources
   "str.c"
-  "console.c"
+  "terminal.c"
   "ush.c"
 )
 
