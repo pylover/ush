@@ -6,7 +6,7 @@
 #include "config.h"
 #include "ush.h"
 #include "state.h"
-#include "terminal.h"
+#include "term.h"
 
 
 #undef UAIO_ARG1
@@ -29,7 +29,11 @@ ush_create(struct euart_device *console, struct ush_executable commands[]) {
         return NULL;
     }
 
-    if (terminal_init(&sh->terminal, console)) {
+    if (term_init(&sh->term, console)) {
+        goto failed;
+    }
+
+    if (str_init(&sh->executing, CONFIG_USH_TERM_LINESIZE)) {
         goto failed;
     }
 
@@ -37,12 +41,9 @@ ush_create(struct euart_device *console, struct ush_executable commands[]) {
     return sh;
 
 failed:
-    terminal_deinit(&sh->terminal);
-
-    if (sh) {
-        free(sh);
-    }
-
+    term_deinit(&sh->term);
+    str_deinit(&sh->executing);
+    free(sh);
     return NULL;
 }
 
@@ -55,7 +56,7 @@ ush_destroy(struct ush *sh) {
         return -1;
     }
 
-    ret |= terminal_deinit(&sh->terminal);
+    ret |= term_deinit(&sh->term);
 
     free(sh);
     return ret;
@@ -64,21 +65,22 @@ ush_destroy(struct ush *sh) {
 
 ASYNC
 ushA(struct uaio_task *self, struct ush *sh) {
-    struct terminal *con = &sh->terminal;
+    struct term *term = &sh->term;
+    struct str *cmd = &sh->executing;
     UAIO_BEGIN(self);
 
     /* loop */
-    terminal_printf(con, LINEBREAK);
+    term_printf(term, LINEBREAK);
     while (true) {
-        TERMINAL_PROMPT(con);
+        TERM_PROMPT(term);
         fflush(stdout);
-        TERMINAL_AREADLINE(self, con);
+        TERM_AREADLINE(self, term);
         if (UAIO_HASERROR(self)) {
-            ERROR("terminal read error");
-            terminal_printf(con, LINEBREAK);
+            ERROR("term read error");
+            term_printf(term, LINEBREAK);
             continue;
         }
-        DEBUG("command: %.*s", con->linesize, con->line);
+        DEBUG("command: %.*s", cmd->len, cmd->start);
     }
 
     /* termination */

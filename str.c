@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "str.h"
 
 
@@ -15,6 +17,7 @@ str_init(struct str *s, size_t size) {
         return -1;
     }
 
+    s->size = size;
     s->len = 0;
     s->start = p;
     return 0;
@@ -26,4 +29,48 @@ str_deinit(struct str *s) {
     if (s->start) {
         free(s->start);
     }
+}
+
+
+int
+str_append(struct str *s, char c) {
+    if (STR_FULL(s)) {
+        return -1;
+    }
+
+    s->start[s->len++] = c;
+    return 0;
+}
+
+
+int
+str_delete(struct str *s, int index) {
+    int last;
+    char *buf;
+
+    if (s->len == 0) {
+        return -1;
+    }
+
+    if (index < 0) {
+        index += s->len;
+    }
+
+    last = s->len - 1;
+    if ((index < 0) || (index > last)) {
+        return -1;
+    }
+
+    /* 012345
+     * abcde
+     *    ^
+     * abce
+     */
+    s->len--;
+    buf = s->start;
+    for (; index < last; index++) {
+        buf[index] = buf[index + 1];
+    }
+
+    return 0;
 }

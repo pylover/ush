@@ -1,7 +1,7 @@
 set(sources
   "str.c"
-  "history.c"
-  "terminal.c"
+  "cmdring.c"
+  "term.c"
   "ush.c"
 )
 

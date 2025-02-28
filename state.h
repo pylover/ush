@@ -3,11 +3,12 @@
 
 
 #include "ush.h"
-#include "terminal.h"
+#include "term.h"
 
 
 typedef struct ush {
-    struct terminal terminal;
+    struct term term;
+    struct str executing;
 
     /* user provided commands vector */
     struct ush_executable *commands;

@@ -7,6 +7,7 @@
 
 
 typedef struct str {
+    size_t size;
     size_t len;
     char *start;
 } str_t;
@@ -17,12 +18,24 @@ typedef struct str {
 #include <ering.h>
 
 
+#define STR_AVAIL(s) ((s)->size - (s)->len)
+#define STR_FULL(s) (STR_AVAIL(s) == 0)
+
+
 int
 str_init(struct str *s, size_t size);
 
 
 void
 str_deinit(struct str *s);
+
+
+int
+str_append(struct str *s, char c);
+
+
+int
+str_delete(struct str *s, int index);
 
 
 #endif  // STR_H_

@@ -10,15 +10,15 @@ menu "ush"
 		bool "CRLF"
 	endchoice
 	
-	config USH_TERMINAL_READER_RINGMASK_BITS
+	config USH_TERM_READER_RINGMASK_BITS
 		int "terminal reader circular buffer mask bits(aka size!)"
 		default 8 
 
-	config USH_TERMINAL_HISTORY_RINGMASK_BITS
+	config USH_TERM_HISTORY_RINGMASK_BITS
 		int "terminal history circular buffer mask bits(aka size!)"
 		default 5 
 
-	config USH_TERMINAL_LINESIZE
+	config USH_TERM_LINESIZE
 		int "terminal command line size."
 		default 256
 
@@ -29,6 +29,6 @@ menu "ush"
 endmenu
 
 
-# 	config USH_TERMINAL_READER_TIMEOUT_US
+# 	config USH_TERM_READER_TIMEOUT_US
 # 		int "terminal reader timeout in microseconds."
 # 		default 1000
