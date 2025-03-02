@@ -56,6 +56,7 @@ ush_destroy(struct ush *sh) {
         return -1;
     }
 
+    str_deinit(&sh->executing);
     ret |= term_deinit(&sh->term);
 
     free(sh);
@@ -72,15 +73,16 @@ ushA(struct uaio_task *self, struct ush *sh) {
     /* loop */
     term_printf(term, LINEBREAK);
     while (true) {
-        TERM_PROMPT(term);
-        fflush(stdout);
-        TERM_AREADLINE(self, term);
+        cmd->len = 0;
+        TERM_AREADLINE(self, term, cmd);
         if (UAIO_HASERROR(self)) {
             ERROR("term read error");
             term_printf(term, LINEBREAK);
             continue;
         }
-        DEBUG("command: %.*s", cmd->len, cmd->start);
+        if (cmd->len) {
+            DEBUG("command: %.*s", cmd->len, cmd->start);
+        }
     }
 
     /* termination */

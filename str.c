@@ -1,4 +1,7 @@
 #include <stdlib.h>
+#include <string.h>
+
+#include <elog.h>
 
 #include "str.h"
 
@@ -72,5 +75,13 @@ str_delete(struct str *s, int index) {
         buf[index] = buf[index + 1];
     }
 
+    return 0;
+}
+
+
+int
+str_copy(struct str *dst, struct str *src) {
+    strncpy(dst->start, src->start, src->len);
+    dst->len = src->len;
     return 0;
 }

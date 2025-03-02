@@ -38,4 +38,8 @@ int
 str_delete(struct str *s, int index);
 
 
+int
+str_copy(struct str *dst, struct str *src);
+
+
 #endif  // STR_H_

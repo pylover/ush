@@ -19,16 +19,15 @@ typedef struct term {
 #undef UAIO_ARG2
 #undef UAIO_ENTITY
 #define UAIO_ENTITY term
+#define UAIO_ARG1 struct str*
 #include "uaio_generic.h"
 
 
 #define TERM_OUTFD(t) (t)->device->outfd
-#define TERM_PROMPT(t) \
-    term_printf(t, "%s%s:# ", ANSI_RESET, CONFIG_USH_PROMPT)
-#define TERM_AWAIT(task, coro, t) \
-    UAIO_AWAIT(task, term, coro, t)
-#define TERM_AREADLINE(task, t) \
-    TERM_AWAIT(task, term_readA, t)
+#define TERM_AWAIT(task, coro, t, o) \
+    UAIO_AWAIT(task, term, coro, t, o)
+#define TERM_AREADLINE(task, t, o) \
+    TERM_AWAIT(task, term_readA, t, o)
 
 
 int
@@ -44,11 +43,15 @@ term_printf(struct term *term, const char *restrict fmt, ...);
 
 
 int
+term_prompt(struct term *term);
+
+
+int
 term_append(struct term *term, char c);
 
 
 ASYNC
-term_readA(struct uaio_task *self, struct term *term);
+term_readA(struct uaio_task *self, struct term *term, struct str *out);
 
 
 #endif
