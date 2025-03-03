@@ -9,6 +9,8 @@
 typedef struct cmd {
     size_t size;
     size_t len;
+
+    // TODO: rename to buff
     char *start;
 } cmd_t;
 

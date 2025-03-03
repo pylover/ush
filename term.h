@@ -16,8 +16,8 @@
 typedef struct term {
     int outfd;
     struct euart_reader reader;
-    struct cmdring cmdring;
-    unsigned int row;
+    struct cmdring history;
+    unsigned int rotation;
     unsigned int col;
 } term_t;
 

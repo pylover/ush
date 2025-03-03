@@ -16,7 +16,7 @@ menu "ush"
 
 	config USH_TERM_HISTORY_RINGMASK_BITS
 		int "terminal history circular buffer mask bits(aka size!)"
-		default 5 
+		default 4 
 
 	config USH_TERM_LINESIZE
 		int "terminal command line size."

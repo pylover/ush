@@ -1,3 +1,4 @@
+- All todos
 - banner
 - lint
 - segment commands using ;

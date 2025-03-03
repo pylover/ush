@@ -96,21 +96,6 @@ term_backspace(struct ush *sh) {
 
 
 void
-term_navleft(struct ush_cmdline l, int c) {
-    if (!l->cursor) {
-        return;
-    }
-
-    if (!c) {
-        return;
-    }
-
-    printf("%c[%dD", CHAR_ESCAPE, c);
-    l->cursor -= c;
-}
-
-
-void
 term_navright(struct ush *sh, int c) {
     if (sh->cursor == sh->cmdsize) {
         return;

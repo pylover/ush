@@ -21,7 +21,7 @@
 #include "uaio_generic.c"
 
 
-#define CMDLINE(t) ERING_HEADPTROFF(&(t)->cmdring, (t)->row)
+#define CMDLINE(t) ERING_HEADPTROFF(&(t)->history, (t)->rotation)
 
 
 static int
@@ -37,7 +37,7 @@ _printf(struct term *term, const char *restrict fmt, ...) {
 
 
 static int
-_cmdline_append(struct term *term, char c) {
+_appendchar(struct term *term, char c) {
     struct cmd *s = CMDLINE(term);
 
     if (cmd_append(s, c)) {
@@ -54,16 +54,26 @@ _cmdline_append(struct term *term, char c) {
 }
 
 
-// static int
-// _cmdline_rewrite(struct term *term) {
-//     if (sh->cursor) {
-//         term_navleft(&sh->cmdline, sh->cursor);
-//     }
-//     printf("\33[K");
-//     term_overwrite(sh, "%.*s", sh->cmdsize, sh->cmdline);
-// }
-//
-//
+void
+_cursor_move(struct term *term, int cols) {
+    _printf(term, "%c[%d%c", ASCII_ESC, abs(cols), cols < 0? 'D': 'C');
+    term->col += cols;
+}
+
+
+static void
+_rewrite(struct term *term) {
+    struct cmd *c = CMDLINE(term);
+
+    if (term->col) {
+        _cursor_move(term, -term->col);
+    }
+
+    _printf(term, "%s%.*s", ANSI_ERASETOEND, c->len, c->start);
+    term->col = c->len;
+}
+
+
 // static int
 // _cmdline_nav(struct term *term, int step) {
 //     if (!l->cursor) {
@@ -77,28 +87,53 @@ _cmdline_append(struct term *term, char c) {
 //     printf("%c[%dD", CHAR_ESCAPE, c);
 //     l->cursor -= c;
 // }
-//
-//
-// static int
-// _history_nav(struct term *term, int step) {
-//     struct cmdring *history = &term->history;
-//
-//     if (cmdring_prev(history)) {
-//         return -1;
-//     }
-//
-//     return -1;
-// }
-//
-//
-// static int
-// _row_push(struct term *term) {
-//     struct cmdring *cr = &term->history;
-//     if (ERING_ISFULL(cr)) {
-//         ERING_TAILPTR(cr)
-//         ERING_DECR(cr);
-//     }
-// }
+
+
+static int
+_history_rotate(struct term *term, int steps) {
+    int r;
+    struct cmdring *history = &term->history;
+
+    r = term->rotation + steps;
+    if ((r < 0) || (r > ERING_USED(history))) {
+        return -1;
+    }
+
+    term->rotation += steps;
+    _rewrite(term);
+    return 0;
+}
+
+
+/** Puts the current command line (cmdring's head) into the history and
+ * initialize the new head as the command line
+ */
+static int
+_history_put(struct term *term) {
+    bool reuse = false;
+    struct cmdring *history = &term->history;
+
+    if (ERING_ISFULL(history)) {
+        ERING_INCRTAIL(history);
+        reuse = 1;
+    }
+
+    ERING_INCRHEAD(history);
+
+    if (reuse) {
+        CMDLINE(term)->len = 0;
+    }
+    else {
+        /* initialize and allocate the first item of the history */
+        if (cmd_init(ERING_HEADPTR(&term->history),
+                    CONFIG_USH_TERM_LINESIZE)) {
+            ERING_DECRHEAD(history);
+            return -1;
+        }
+    }
+
+    return 0;
+}
 
 
 static int
@@ -130,23 +165,23 @@ term_init(struct term *term, int infd, int outfd) {
     }
 
     /* initialize commands circular buffer */
-    if (cmdring_init(&term->cmdring,
+    if (cmdring_init(&term->history,
                 CONFIG_USH_TERM_HISTORY_RINGMASK_BITS)) {
         goto rollback;
     }
 
-    /* initialize and allocate the first item of the cmdring */
-    if (cmd_init(ERING_HEADPTR(&term->cmdring), CONFIG_USH_TERM_LINESIZE)) {
+    /* initialize and allocate the first item of the history */
+    if (cmd_init(ERING_HEADPTR(&term->history), CONFIG_USH_TERM_LINESIZE)) {
         goto rollback;
     }
 
     term->outfd = outfd;
-    term->row = 0;
+    term->rotation = 0;
     term->col = 0;
     return 0;
 
 rollback:
-    cmdring_deinit(&term->cmdring);
+    cmdring_deinit(&term->history);
     euart_reader_deinit(&term->reader);
     return -1;
 }
@@ -157,16 +192,16 @@ rollback:
 int
 term_deinit(struct term *term) {
     int ret = 0;
-    struct cmdring *cr = &term->cmdring;
+    struct cmdring *history = &term->history;
 
     /* flush the cmdring */
-    cmd_deinit(ERING_HEADPTR(cr));
-    while (ERING_USED(cr)) {
-        cmd_deinit(ERING_TAILPTR(cr));
-        ERING_DECR(cr);
+    cmd_deinit(ERING_HEADPTR(history));
+    while (ERING_USED(history)) {
+        cmd_deinit(ERING_TAILPTR(history));
+        ERING_INCRTAIL(history);
     }
 
-    ret |= cmdring_deinit(cr);
+    ret |= cmdring_deinit(history);
     ret |= euart_reader_deinit(&term->reader);
     return ret;
 }
@@ -189,14 +224,16 @@ _escape(struct uaio_task *self, struct term *term, struct cmd *out) {
 
     EUART_AREAD(self, reader, 1);
     c = ERING_POP(input);
-    DEBUG("escape sequence: %c", c);
     switch (c) {
         case 'A':
-            // term_history_nav(term, 1);
+            _history_rotate(term, 1);
+            break;
         case 'B':
-            // term_history_nav(term, -1);
+            _history_rotate(term, -1);
+            break;
         case 'C':
         case 'D':
+            DEBUG("escape sequence: %c", c);
     }
 
     UAIO_FINALLY(self);
@@ -208,8 +245,10 @@ term_readA(struct uaio_task *self, struct term *term, struct cmd *out) {
     char c;
     struct euart_reader *reader = &term->reader;
     struct u8ring *input = &reader->ring;
+    struct cmd *cmd;
     UAIO_BEGIN(self);
 
+prompt:
     _prompt(term);
     fflush(stdout);
 
@@ -227,11 +266,16 @@ term_readA(struct uaio_task *self, struct term *term, struct cmd *out) {
             ERING_SKIP(input, 1);
 
             if (c == ASCII_LF) {
-                cmd_copy(out, CMDLINE(term));
+                cmd = CMDLINE(term);
+                if (cmd->len == 0) {
+                    goto prompt;
+                }
+                cmd_copy(out, cmd);
+                _history_put(term);
                 UAIO_RETURN(self);
             }
 
-            if (_cmdline_append(term, c)) {
+            if (_appendchar(term, c)) {
                 UAIO_THROW2(self, ENOBUFS);
             }
 
