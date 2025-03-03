@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "helpers.h"
+
 
 typedef struct cmd {
     size_t size;
@@ -18,6 +20,8 @@ typedef struct cmd {
 #define cmd_avail(s) ((s)->size - (s)->len)
 #define cmd_isfull(s) (cmd_avail(s) == 0)
 #define cmd_clear(s) (s)->len = 0
+#define cmd_compare(a, b) \
+    strncmp((a)->start, (b)->start, MAX((a)->len, (b)->len))
 
 
 int

@@ -110,28 +110,35 @@ _history_rotate(struct term *term, int steps) {
  */
 static int
 _history_put(struct term *term) {
-    bool reuse = false;
     struct cmdring *history = &term->history;
+    struct cmd *first = NULL;
 
-    if (ERING_ISFULL(history)) {
-        ERING_INCRTAIL(history);
-        reuse = 1;
-    }
-
-    ERING_INCRHEAD(history);
-
-    if (reuse) {
-        CMDLINE(term)->len = 0;
-    }
-    else {
-        /* initialize and allocate the first item of the history */
-        if (cmd_init(ERING_HEADPTR(&term->history),
-                    CONFIG_USH_TERM_LINESIZE)) {
-            ERING_DECRHEAD(history);
-            return -1;
+    /* prevent duplicate entries in order */
+    if (ERING_USED(history)) {
+        first = ERING_HEADPTROFF(history, 1);
+        DEBUG("first history: %.*s", first->len, first->start);
+        if (cmd_compare(first, ERING_HEADPTR(history)) == 0) {
+            goto done;
         }
     }
 
+    /* reuse the last item if possible */
+    if (ERING_ISFULL(history)) {
+        ERING_INCRTAIL(history);
+        ERING_INCRHEAD(history);
+        goto done;
+    }
+
+    /* initialize and allocate the first item of the history */
+    ERING_INCRHEAD(history);
+    if (cmd_init(ERING_HEADPTR(history), CONFIG_USH_TERM_LINESIZE)) {
+        ERING_DECRHEAD(history);
+        return -1;
+    }
+
+done:
+    ERING_HEADPTR(history)->len = 0;
+    term->col = 0;
     return 0;
 }
 
@@ -143,6 +150,7 @@ _prompt(struct term *term) {
         return -1;
     }
 
+    term->rotation = 0;
     return 0;
 }
 
@@ -269,6 +277,10 @@ prompt:
                 cmd = CMDLINE(term);
                 if (cmd->len == 0) {
                     goto prompt;
+                }
+                if (term->rotation) {
+                    term->rotation = 0;
+                    cmd_copy(CMDLINE(term), cmd);
                 }
                 cmd_copy(out, cmd);
                 _history_put(term);
