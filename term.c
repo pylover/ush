@@ -8,73 +8,45 @@
 #include "term.h"
 
 
+#undef ERING_PREFIX
+#define ERING_PREFIX cmd
+#include <ering.c>
+
+
 #undef UAIO_ARG1
 #undef UAIO_ARG2
 #undef UAIO_ENTITY
 #define UAIO_ENTITY term
-#define UAIO_ARG1 struct str*
+#define UAIO_ARG1 struct cmd*
 #include "uaio_generic.c"
 
 
-int
-term_init(struct term *term, struct euart_device *device) {
-    if ((term == NULL) || (device == NULL)) {
-        return -1;
-    }
-
-    if (euart_reader_init(&term->reader, device->infd,
-                CONFIG_USH_TERM_READER_RINGMASK_BITS)) {
-        return -1;
-    }
-
-    if (cmdring_init(&term->history,
-                CONFIG_USH_TERM_HISTORY_RINGMASK_BITS)) {
-        euart_reader_deinit(&term->reader);
-        return -1;
-    }
-
-    term->device = device;
-    return 0;
-}
+#define CMDLINE(t) ERING_HEADPTROFF(&(t)->cmdring, (t)->row)
 
 
-int
-term_deinit(struct term *term) {
-    int ret = 0;
-    if (term == NULL) {
-        return -1;
-    }
-
-    cmdring_flush(&term->history);
-    ret |= cmdring_deinit(&term->history);
-    ret |= euart_reader_deinit(&term->reader);
-    return ret;
-}
-
-
-int
-term_printf(struct term *term, const char *restrict fmt, ...) {
+static int
+_printf(struct term *term, const char *restrict fmt, ...) {
     int ret;
     va_list args;
 
     va_start(args, fmt);
-    ret = vdprintf(TERM_OUTFD(term), fmt, args);
+    ret = vdprintf(term->outfd, fmt, args);
     va_end(args);
     return ret;
 }
 
 
-int
-term_append(struct term *term, char c) {
-    struct str *s = CMDRING_CURRENT(&term->history);
+static int
+_cmdline_append(struct term *term, char c) {
+    struct cmd *s = CMDLINE(term);
 
-    if (str_append(s, c)) {
+    if (cmd_append(s, c)) {
         return -1;
     }
 
-    if (write(TERM_OUTFD(term), &c, 1) == -1) {
-        str_delete(s, -1);
-        ERROR("device write, fd: %d", TERM_OUTFD(term));
+    if (write(term->outfd, &c, 1) == -1) {
+        cmd_delete(s, -1);
+        ERROR("write");
         return -1;
     }
 
@@ -82,13 +54,56 @@ term_append(struct term *term, char c) {
 }
 
 
-int
-term_prompt(struct term *term) {
-    if (cmdring_pushnew(&term->history)) {
-        return -1;
-    }
+// static int
+// _cmdline_rewrite(struct term *term) {
+//     if (sh->cursor) {
+//         term_navleft(&sh->cmdline, sh->cursor);
+//     }
+//     printf("\33[K");
+//     term_overwrite(sh, "%.*s", sh->cmdsize, sh->cmdline);
+// }
+//
+//
+// static int
+// _cmdline_nav(struct term *term, int step) {
+//     if (!l->cursor) {
+//         return;
+//     }
+//
+//     if (!c) {
+//         return;
+//     }
+//
+//     printf("%c[%dD", CHAR_ESCAPE, c);
+//     l->cursor -= c;
+// }
+//
+//
+// static int
+// _history_nav(struct term *term, int step) {
+//     struct cmdring *history = &term->history;
+//
+//     if (cmdring_prev(history)) {
+//         return -1;
+//     }
+//
+//     return -1;
+// }
+//
+//
+// static int
+// _row_push(struct term *term) {
+//     struct cmdring *cr = &term->history;
+//     if (ERING_ISFULL(cr)) {
+//         ERING_TAILPTR(cr)
+//         ERING_DECR(cr);
+//     }
+// }
 
-    if (term_printf(term, "%s%s%s:# ", LINEBREAK, ANSI_RESET,
+
+static int
+_prompt(struct term *term) {
+    if (_printf(term, "%s%s%s:# ", LINEBREAK, ANSI_RESET,
                 CONFIG_USH_PROMPT) == -1) {
         return -1;
     }
@@ -97,27 +112,89 @@ term_prompt(struct term *term) {
 }
 
 
+/** Initialize and allocate resources for the terminal
+ */
+int
+term_init(struct term *term, int infd, int outfd) {
+    if ((term == NULL) || (infd < 0) || (outfd < 0)) {
+        return -1;
+    }
+
+    /* zero set */
+    memset(term, 0, sizeof(struct term));
+
+    /* initialize uart reader */
+    if (euart_reader_init(&term->reader, infd,
+                CONFIG_USH_TERM_READER_RINGMASK_BITS)) {
+        return -1;
+    }
+
+    /* initialize commands circular buffer */
+    if (cmdring_init(&term->cmdring,
+                CONFIG_USH_TERM_HISTORY_RINGMASK_BITS)) {
+        goto rollback;
+    }
+
+    /* initialize and allocate the first item of the cmdring */
+    if (cmd_init(ERING_HEADPTR(&term->cmdring), CONFIG_USH_TERM_LINESIZE)) {
+        goto rollback;
+    }
+
+    term->outfd = outfd;
+    term->row = 0;
+    term->col = 0;
+    return 0;
+
+rollback:
+    cmdring_deinit(&term->cmdring);
+    euart_reader_deinit(&term->reader);
+    return -1;
+}
+
+
+/** Deinitialize and release all resource allocated for the terminal
+ */
+int
+term_deinit(struct term *term) {
+    int ret = 0;
+    struct cmdring *cr = &term->cmdring;
+
+    /* flush the cmdring */
+    cmd_deinit(ERING_HEADPTR(cr));
+    while (ERING_USED(cr)) {
+        cmd_deinit(ERING_TAILPTR(cr));
+        ERING_DECR(cr);
+    }
+
+    ret |= cmdring_deinit(cr);
+    ret |= euart_reader_deinit(&term->reader);
+    return ret;
+}
+
+
 static ASYNC
-_escape(struct uaio_task *self, struct term *term, struct str *out) {
+_escape(struct uaio_task *self, struct term *term, struct cmd *out) {
     char c;
     struct euart_reader *reader = &term->reader;
-    struct u8ring *ring = &reader->ring;
+    struct u8ring *input = &reader->ring;
     UAIO_BEGIN(self);
-    ERING_SKIP(ring, 1);
+    ERING_SKIP(input, 1);
 
     EUART_AREAD(self, reader, 1);
-    c = ERING_POP(ring);
+    c = ERING_POP(input);
     if (c != '[') {
         WARN("escape sequence not supported: %d", c);
         UAIO_RETURN(self);
     }
 
     EUART_AREAD(self, reader, 1);
-    c = ERING_POP(ring);
+    c = ERING_POP(input);
     DEBUG("escape sequence: %c", c);
     switch (c) {
         case 'A':
+            // term_history_nav(term, 1);
         case 'B':
+            // term_history_nav(term, -1);
         case 'C':
         case 'D':
     }
@@ -127,33 +204,34 @@ _escape(struct uaio_task *self, struct term *term, struct str *out) {
 
 
 ASYNC
-term_readA(struct uaio_task *self, struct term *term, struct str *out) {
+term_readA(struct uaio_task *self, struct term *term, struct cmd *out) {
     char c;
     struct euart_reader *reader = &term->reader;
-    struct u8ring *ring = &reader->ring;
+    struct u8ring *input = &reader->ring;
     UAIO_BEGIN(self);
 
-    term_prompt(term);
+    _prompt(term);
     fflush(stdout);
 
     while (true) {
-        while (ERING_USED(ring)) {
-            c = ERING_GET(ring);
+        while (ERING_USED(input)) {
+            c = ERING_GET(input);
 
+            /* ansi */
             if (c == ASCII_ESC) {
                 TERM_AWAIT(self, _escape, term, NULL);
                 continue;
             }
 
             /* consume the char */
-            ERING_SKIP(ring, 1);
+            ERING_SKIP(input, 1);
 
             if (c == ASCII_LF) {
-                str_copy(out, CMDRING_CURRENT(&term->history));
+                cmd_copy(out, CMDLINE(term));
                 UAIO_RETURN(self);
             }
 
-            if (term_append(term, c)) {
+            if (_cmdline_append(term, c)) {
                 UAIO_THROW2(self, ENOBUFS);
             }
 

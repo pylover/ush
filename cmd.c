@@ -1,18 +1,12 @@
 #include <stdlib.h>
-#include <string.h>
 
 #include <elog.h>
 
-#include "str.h"
-
-
-#undef ERING_PREFIX
-#define ERING_PREFIX str
-#include <ering.c>
+#include "cmd.h"
 
 
 int
-str_init(struct str *s, size_t size) {
+cmd_init(struct cmd *s, size_t size) {
     char *p;
 
     p = malloc(size);
@@ -28,7 +22,7 @@ str_init(struct str *s, size_t size) {
 
 
 void
-str_deinit(struct str *s) {
+cmd_deinit(struct cmd *s) {
     if (s->start) {
         free(s->start);
     }
@@ -36,8 +30,8 @@ str_deinit(struct str *s) {
 
 
 int
-str_append(struct str *s, char c) {
-    if (STR_FULL(s)) {
+cmd_append(struct cmd *s, char c) {
+    if (cmd_isfull(s)) {
         return -1;
     }
 
@@ -47,7 +41,7 @@ str_append(struct str *s, char c) {
 
 
 int
-str_delete(struct str *s, int index) {
+cmd_delete(struct cmd *s, int index) {
     int last;
     char *buf;
 
@@ -80,7 +74,7 @@ str_delete(struct str *s, int index) {
 
 
 int
-str_copy(struct str *dst, struct str *src) {
+cmd_copy(struct cmd *dst, struct cmd *src) {
     strncpy(dst->start, src->start, src->len);
     dst->len = src->len;
     return 0;

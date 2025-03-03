@@ -5,13 +5,20 @@
 #include <euart.h>
 
 #include "ansi.h"
-#include "cmdring.h"
+#include "cmd.h"
+
+
+#undef ERING_PREFIX
+#define ERING_PREFIX cmd
+#include <ering.h>
 
 
 typedef struct term {
-    struct euart_device *device;
+    int outfd;
     struct euart_reader reader;
-    struct cmdring history;
+    struct cmdring cmdring;
+    unsigned int row;
+    unsigned int col;
 } term_t;
 
 
@@ -19,11 +26,11 @@ typedef struct term {
 #undef UAIO_ARG2
 #undef UAIO_ENTITY
 #define UAIO_ENTITY term
-#define UAIO_ARG1 struct str*
+#define UAIO_ARG1 struct cmd*
 #include "uaio_generic.h"
 
 
-#define TERM_OUTFD(t) (t)->device->outfd
+#define TERM_OUTFD(t) (t)->outfd
 #define TERM_AWAIT(task, coro, t, o) \
     UAIO_AWAIT(task, term, coro, t, o)
 #define TERM_AREADLINE(task, t, o) \
@@ -31,27 +38,15 @@ typedef struct term {
 
 
 int
-term_init(struct term *term, struct euart_device *device);
+term_init(struct term *term, int infd, int outfd);
 
 
 int
 term_deinit(struct term *term);
 
 
-int
-term_printf(struct term *term, const char *restrict fmt, ...);
-
-
-int
-term_prompt(struct term *term);
-
-
-int
-term_append(struct term *term, char c);
-
-
 ASYNC
-term_readA(struct uaio_task *self, struct term *term, struct str *out);
+term_readA(struct uaio_task *self, struct term *term, struct cmd *out);
 
 
 #endif

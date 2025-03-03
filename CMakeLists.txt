@@ -1,6 +1,5 @@
 set(sources
-  "str.c"
-  "cmdring.c"
+  "cmd.c"
   "term.c"
   "ush.c"
 )

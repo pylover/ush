@@ -29,11 +29,11 @@ ush_create(struct euart_device *console, struct ush_executable commands[]) {
         return NULL;
     }
 
-    if (term_init(&sh->term, console)) {
+    if (term_init(&sh->term, console->infd, console->outfd)) {
         goto failed;
     }
 
-    if (str_init(&sh->executing, CONFIG_USH_TERM_LINESIZE)) {
+    if (cmd_init(&sh->executing, CONFIG_USH_TERM_LINESIZE)) {
         goto failed;
     }
 
@@ -42,7 +42,7 @@ ush_create(struct euart_device *console, struct ush_executable commands[]) {
 
 failed:
     term_deinit(&sh->term);
-    str_deinit(&sh->executing);
+    cmd_deinit(&sh->executing);
     free(sh);
     return NULL;
 }
@@ -56,7 +56,7 @@ ush_destroy(struct ush *sh) {
         return -1;
     }
 
-    str_deinit(&sh->executing);
+    cmd_deinit(&sh->executing);
     ret |= term_deinit(&sh->term);
 
     free(sh);
@@ -67,17 +67,15 @@ ush_destroy(struct ush *sh) {
 ASYNC
 ushA(struct uaio_task *self, struct ush *sh) {
     struct term *term = &sh->term;
-    struct str *cmd = &sh->executing;
+    struct cmd *cmd = &sh->executing;
     UAIO_BEGIN(self);
 
     /* loop */
-    term_printf(term, LINEBREAK);
     while (true) {
-        cmd->len = 0;
+        cmd_clear(cmd);
         TERM_AREADLINE(self, term, cmd);
         if (UAIO_HASERROR(self)) {
             ERROR("term read error");
-            term_printf(term, LINEBREAK);
             continue;
         }
         if (cmd->len) {
