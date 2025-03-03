@@ -28,7 +28,6 @@ typedef struct ush_process {
 #include "uaio_generic.h"
 
 
-// TODO: rename to ush_executable
 struct ush_executable {
     const char *name;
     ush_process_coro_t entrypoint;
