@@ -16,15 +16,15 @@ cmd_init(struct cmd *s, size_t size) {
 
     s->size = size;
     s->len = 0;
-    s->start = p;
+    s->buff = p;
     return 0;
 }
 
 
 void
 cmd_deinit(struct cmd *s) {
-    if (s->start) {
-        free(s->start);
+    if (s->buff) {
+        free(s->buff);
     }
 }
 
@@ -35,7 +35,7 @@ cmd_append(struct cmd *s, char c) {
         return -1;
     }
 
-    s->start[s->len++] = c;
+    s->buff[s->len++] = c;
     return 0;
 }
 
@@ -64,7 +64,7 @@ cmd_delete(struct cmd *s, int index) {
      * abce
      */
     s->len--;
-    buf = s->start;
+    buf = s->buff;
     for (; index < last; index++) {
         buf[index] = buf[index + 1];
     }
@@ -75,7 +75,7 @@ cmd_delete(struct cmd *s, int index) {
 
 int
 cmd_copy(struct cmd *dst, struct cmd *src) {
-    strncpy(dst->start, src->start, src->len);
+    strncpy(dst->buff, src->buff, src->len);
     dst->len = src->len;
     return 0;
 }

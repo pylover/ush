@@ -78,7 +78,7 @@ ushA(struct uaio_task *self, struct ush *sh) {
             ERROR("term read error");
             continue;
         }
-        DEBUG("command: %.*s", cmd->len, cmd->start);
+        DEBUG("command: %.*s", cmd->len, cmd->buff);
     }
 
     /* termination */

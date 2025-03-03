@@ -69,24 +69,9 @@ _rewrite(struct term *term) {
         _cursor_move(term, -term->col);
     }
 
-    _printf(term, "%s%.*s", ANSI_ERASETOEND, c->len, c->start);
+    _printf(term, "%s%.*s", ANSI_ERASETOEND, c->len, c->buff);
     term->col = c->len;
 }
-
-
-// static int
-// _cmdline_nav(struct term *term, int step) {
-//     if (!l->cursor) {
-//         return;
-//     }
-//
-//     if (!c) {
-//         return;
-//     }
-//
-//     printf("%c[%dD", CHAR_ESCAPE, c);
-//     l->cursor -= c;
-// }
 
 
 static int
@@ -116,7 +101,7 @@ _history_put(struct term *term) {
     /* prevent duplicate entries in order */
     if (ERING_USED(history)) {
         first = ERING_HEADPTROFF(history, 1);
-        DEBUG("first history: %.*s", first->len, first->start);
+        DEBUG("first history: %.*s", first->len, first->buff);
         if (cmd_compare(first, ERING_HEADPTR(history)) == 0) {
             goto done;
         }

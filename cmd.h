@@ -11,9 +11,7 @@
 typedef struct cmd {
     size_t size;
     size_t len;
-
-    // TODO: rename to buff
-    char *start;
+    char *buff;
 } cmd_t;
 
 
@@ -21,7 +19,7 @@ typedef struct cmd {
 #define cmd_isfull(s) (cmd_avail(s) == 0)
 #define cmd_clear(s) (s)->len = 0
 #define cmd_compare(a, b) \
-    strncmp((a)->start, (b)->start, MAX((a)->len, (b)->len))
+    strncmp((a)->buff, (b)->buff, MAX((a)->len, (b)->len))
 
 
 int
