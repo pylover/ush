@@ -68,6 +68,43 @@ _cursor_move(struct term *term, int cols) {
 }
 
 
+static int
+_insert(struct term *term, char c) {
+    // 01234567
+    // abcdefgh
+    //    ^
+    // abc defgh
+    //    ^
+    int i;
+    int curoff;
+    struct cmd *cmd = CMDLINE(term);
+
+    curoff = cmd->len - term->col;
+
+    if (cmd->len == CONFIG_USH_TERM_LINESIZE) {
+        return -1;
+    }
+
+    if (curoff) {
+        for (i = cmd->len - 1; i >= term->col; i--) {
+            cmd->buff[i + 1] = cmd->buff[i];
+        }
+    }
+
+    cmd->buff[term->col] = c;
+    cmd->len++;
+    write(term->outfd, &c, 1);
+    term->col++;
+
+    if (curoff) {
+        write(term->outfd, cmd->buff + term->col, curoff);
+        _printf(term, "%c[%dD", ASCII_ESC, abs(curoff));
+    }
+
+    return 0;
+}
+
+
 static void
 _delete(struct term *term) {
     /*   buffer     terminal
@@ -415,12 +452,12 @@ prompt:
                 UAIO_RETURN(self);
             }
 
-            if (_appendchar(term, c)) {
+            // if (_appendchar(term, c)) {
+            if (_insert(term, c)) {
                 UAIO_THROW2(self, ENOBUFS);
             }
         }
         fsync(term->outfd);
-        // fflush(stdout);
         EUART_AREAD(self, reader, 1);
     }
 
