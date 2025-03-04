@@ -3,9 +3,20 @@
 
 
 /* control characters */
-#define ASCII_LF '\n'
-#define ASCII_ESC '\033'
+#define ASCII_LF 10
+#define ASCII_ESC 27
 
+
+/** idf monitor
+ * backspace: 8
+ * delete: 27[126
+ */
+
+/** screen
+ * backspace: 127
+ * delete: 27[126
+ */
+#define ASCII_ISBACKSPACE(c) ((c == 8) || (c == 127))
 
 
 /** ASCII control characters (character code 0-31)

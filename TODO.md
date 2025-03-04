@@ -1,4 +1,4 @@
-- All todos
+- optimize some printfs with write(2)
 - banner
 - lint
 - segment commands using ;

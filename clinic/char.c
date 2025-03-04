@@ -6,7 +6,4 @@
 #define CHAR_BACKSPACE 127
 
 
-#define ISNAV(c) (((c) == CHAR_ESCAPE) || ((c) == CHAR_BACKSPACE))
-
-
 #endif  // CHAR_H_

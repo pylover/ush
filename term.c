@@ -50,14 +50,132 @@ _appendchar(struct term *term, char c) {
         return -1;
     }
 
+    term->col++;
     return 0;
 }
 
 
-void
+static void
 _cursor_move(struct term *term, int cols) {
+    int newcol = term->col + cols;
+
+    if ((newcol < 0) || (newcol > CMDLINE(term)->len)) {
+        return;
+    }
+
     _printf(term, "%c[%d%c", ASCII_ESC, abs(cols), cols < 0? 'D': 'C');
-    term->col += cols;
+    term->col = newcol;
+}
+
+
+static void
+_delete(struct term *term) {
+    /*   buffer     terminal
+     *   01234567   01234567
+     * 0 abcdefgh   abcdefgh
+     *       ^          ^
+     * 1 abcdfgh    abcdefgh
+     *       ^          ^
+     * 2 abcdfgh    abcdfghh
+     *       ^             ^
+     * 3 abcdfgh    abcdfgh
+     *       ^             ^
+     * 4 abcdfgh    abcdfgh
+     *       ^          ^
+     *
+     *   012   012
+     * 0 abc   abc
+     *   ^     ^
+     */
+    int i;
+    int curoff;
+    struct cmd *cmd = CMDLINE(term);
+
+    /* 0 */
+    if (term->col >= cmd->len) {
+        return;
+    }
+
+    /* 1 */
+    for (i = term->col + 1; i < cmd->len; i++) {
+        cmd->buff[i - 1] = cmd->buff[i];
+    }
+    cmd->len--;
+
+    /* 2 */
+    curoff = cmd->len - term->col;
+    if (curoff) {
+        write(term->outfd, cmd->buff + term->col, curoff);
+    }
+
+    write(term->outfd, " \b", 2);
+    if (!curoff) {
+        return;
+    }
+
+    /* 3 */
+    write(term->outfd, " \b", 2);
+
+    /* 4 */
+    _printf(term, "%c[%dD", ASCII_ESC, abs(curoff));
+}
+
+
+static void
+_backspace(struct term *term) {
+    /*   buffer     terminal
+     *   01234567   01234567
+     * 0 abcdefgh   abcdefgh
+     *       ^          ^
+     * 1 abcefgh    abcdefgh
+     *      ^           ^
+     * 2 abcefgh    abcefghh
+     *      ^              ^
+     * 3 abcefgh    abcefgh
+     *      ^              ^
+     * 4 abcefgh    abcefgh
+     *      ^          ^
+     *
+     *   0123   0123
+     * 0 abc    abc
+     *      ^      ^
+     * 1 ab     abc
+     *     ^       ^
+     * 2 ab     abc
+     *     ^      ^
+     * 3 ab     ab
+     *     ^      ^
+     */
+    int i;
+    int curoff;
+    struct cmd *cmd = CMDLINE(term);
+
+    /* 0 */
+    if (!term->col) {
+        return;
+    }
+
+    /* 1 */
+    for (i = term->col; i < cmd->len; i++) {
+        cmd->buff[i - 1] = cmd->buff[i];
+    }
+    term->col--;
+    cmd->len--;
+
+    /* 2 */
+    write(term->outfd, "\b", 1);
+    curoff = cmd->len - term->col;
+    if (curoff) {
+        write(term->outfd, cmd->buff + term->col, curoff);
+    }
+
+    /* 3 */
+    write(term->outfd, " \b", 2);
+
+    /* 4 */
+    if (curoff) {
+        _printf(term, "%c[%dD", ASCII_ESC, abs(curoff));
+    }
 }
 
 
@@ -101,7 +219,6 @@ _history_put(struct term *term) {
     /* prevent duplicate entries in order */
     if (ERING_USED(history)) {
         first = ERING_HEADPTROFF(history, 1);
-        DEBUG("first history: %.*s", first->len, first->buff);
         if (cmd_compare(first, ERING_HEADPTR(history)) == 0) {
             goto done;
         }
@@ -199,17 +316,18 @@ term_deinit(struct term *term) {
     return ret;
 }
 
-
 static ASYNC
 _escape(struct uaio_task *self, struct term *term, struct cmd *out) {
-    char c;
+    char c = 0;
     struct euart_reader *reader = &term->reader;
     struct u8ring *input = &reader->ring;
     UAIO_BEGIN(self);
-    ERING_SKIP(input, 1);
 
+    // FIXME: single aread with timeout
     EUART_AREAD(self, reader, 1);
     c = ERING_POP(input);
+
+    /* ansi control */
     if (c != '[') {
         WARN("escape sequence not supported: %d", c);
         UAIO_RETURN(self);
@@ -217,6 +335,19 @@ _escape(struct uaio_task *self, struct term *term, struct cmd *out) {
 
     EUART_AREAD(self, reader, 1);
     c = ERING_POP(input);
+
+    /* delete */
+    if (c == '3') {
+        EUART_AREAD(self, reader, 1);
+        c = ERING_POP(input);
+        if (c == 126) {
+            _delete(term);
+            UAIO_RETURN(self);
+        }
+        WARN("escape sequence not supported: ^[3%d", c);
+        UAIO_RETURN(self);
+    }
+
     switch (c) {
         case 'A':
             _history_rotate(term, 1);
@@ -225,9 +356,16 @@ _escape(struct uaio_task *self, struct term *term, struct cmd *out) {
             _history_rotate(term, -1);
             break;
         case 'C':
+            _cursor_move(term, 1);
+            break;
         case 'D':
-            DEBUG("escape sequence: %c", c);
+            _cursor_move(term, -1);
+            break;
+        default:
+            WARN("escape sequence: %c is not supported", c);
+            break;
     }
+
 
     UAIO_FINALLY(self);
 }
@@ -243,11 +381,13 @@ term_readA(struct uaio_task *self, struct term *term, struct cmd *out) {
 
 prompt:
     _prompt(term);
-    fflush(stdout);
+    // fflush(stdout);
 
     while (true) {
         while (ERING_USED(input)) {
-            c = ERING_GET(input);
+            c = ERING_POP(input);
+
+            //DEBUG("c: %d", c);
 
             /* ansi */
             if (c == ASCII_ESC) {
@@ -255,8 +395,11 @@ prompt:
                 continue;
             }
 
-            /* consume the char */
-            ERING_SKIP(input, 1);
+            /* backspace */
+            if (ASCII_ISBACKSPACE(c)) {
+                _backspace(term);
+                continue;
+            }
 
             if (c == ASCII_LF) {
                 cmd = CMDLINE(term);
@@ -275,8 +418,9 @@ prompt:
             if (_appendchar(term, c)) {
                 UAIO_THROW2(self, ENOBUFS);
             }
-
         }
+        fsync(term->outfd);
+        // fflush(stdout);
         EUART_AREAD(self, reader, 1);
     }
 
