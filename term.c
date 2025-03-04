@@ -341,8 +341,10 @@ _escape(struct uaio_task *self, struct term *term, struct cmd *out) {
     struct u8ring *input = &reader->ring;
     UAIO_BEGIN(self);
 
-    // FIXME: single aread with timeout
-    EUART_AREAD(self, reader, 1);
+    EUART_AREADT(self, reader, 3, 500);
+    if (ERING_USED(input) < 2) {
+        UAIO_RETURN(self);
+    }
     c = ERING_POP(input);
 
     /* ansi control */
@@ -351,12 +353,16 @@ _escape(struct uaio_task *self, struct term *term, struct cmd *out) {
         UAIO_RETURN(self);
     }
 
-    EUART_AREAD(self, reader, 1);
+    if (ERING_ISEMPTY(input)) {
+        UAIO_RETURN(self);
+    }
     c = ERING_POP(input);
 
     /* delete */
     if (c == '3') {
-        EUART_AREAD(self, reader, 1);
+        if (ERING_ISEMPTY(input)) {
+            UAIO_RETURN(self);
+        }
         c = ERING_POP(input);
         if (c == 126) {
             _delete(term);
