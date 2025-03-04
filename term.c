@@ -36,25 +36,6 @@ _printf(struct term *term, const char *restrict fmt, ...) {
 }
 
 
-static int
-_appendchar(struct term *term, char c) {
-    struct cmd *s = CMDLINE(term);
-
-    if (cmd_append(s, c)) {
-        return -1;
-    }
-
-    if (write(term->outfd, &c, 1) == -1) {
-        cmd_delete(s, -1);
-        ERROR("write");
-        return -1;
-    }
-
-    term->col++;
-    return 0;
-}
-
-
 static void
 _cursor_move(struct term *term, int cols) {
     int newcol = term->col + cols;
@@ -452,7 +433,6 @@ prompt:
                 UAIO_RETURN(self);
             }
 
-            // if (_appendchar(term, c)) {
             if (_insert(term, c)) {
                 UAIO_THROW2(self, ENOBUFS);
             }
