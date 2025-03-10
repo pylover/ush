@@ -30,10 +30,8 @@ typedef struct term {
 #include "uaio_generic.h"
 
 
-#define TERM_AWAIT(task, coro, t, o) \
-    UAIO_AWAIT(task, term, coro, t, o)
-#define TERM_AREADLINE(task, t, o) \
-    TERM_AWAIT(task, term_readA, t, o)
+#define TERM_AWAIT(task, coro, t, o) UAIO_AWAIT(task, term, coro, t, o)
+#define TERM_AREADLINE(task, t, o) TERM_AWAIT(task, term_readA, t, o)
 
 
 int

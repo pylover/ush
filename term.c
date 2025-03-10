@@ -341,7 +341,7 @@ _escape(struct uaio_task *self, struct term *term, struct cmd *out) {
     struct u8ring *input = &reader->ring;
     UAIO_BEGIN(self);
 
-    EUART_AREADT(self, reader, 3, 500);
+    EUART_AREADT(self, reader, 3, CONFIG_USH_TERM_READER_TIMEOUT_US);
     if (ERING_USED(input) < 2) {
         UAIO_RETURN(self);
     }

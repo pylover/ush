@@ -9,6 +9,10 @@ menu "ush"
 	config USH_LINEBREAK_CRLF
 		bool "CRLF"
 	endchoice
+
+	config USH_TERM_READER_TIMEOUT_US
+		int "terminal reader timeout in microseconds."
+		default 500
 	
 	config USH_TERM_READER_RINGMASK_BITS
 		int "terminal reader circular buffer mask bits(aka size!)"
@@ -27,8 +31,3 @@ menu "ush"
 		default "esp32"
 
 endmenu
-
-
-# 	config USH_TERM_READER_TIMEOUT_US
-# 		int "terminal reader timeout in microseconds."
-# 		default 1000
