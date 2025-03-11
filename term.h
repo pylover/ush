@@ -13,12 +13,21 @@
 #include <ering.h>
 
 
+enum vi_mode {
+    VI_NORMAL,
+    VI_INSERT,
+};
+
+
 typedef struct term {
     int outfd;
     struct euart_reader reader;
     struct cmdring history;
     unsigned int rotation;
     unsigned int col;
+#ifdef CONFIG_USH_VI
+    enum vi_mode mode;
+#endif
 } term_t;
 
 
@@ -26,12 +35,15 @@ typedef struct term {
 #undef UAIO_ARG2
 #undef UAIO_ENTITY
 #define UAIO_ENTITY term
-#define UAIO_ARG1 struct cmd*
 #include "uaio_generic.h"
 
 
-#define TERM_AWAIT(task, coro, t, o) UAIO_AWAIT(task, term, coro, t, o)
-#define TERM_AREADLINE(task, t, o) TERM_AWAIT(task, term_readA, t, o)
+#define TERM_AWAIT(task, coro, t) UAIO_AWAIT(task, term, coro, t)
+#define TERM_AREADLINE(task, t) TERM_AWAIT(task, term_readA, t)
+#define TERM_CMDLINE(t) ERING_HEADPTROFF(&(t)->history, (t)->rotation)
+#define TERM_INBUFF_COUNT(t) ERING_USED(&(t)->reader.ring)
+#define TERM_INBUFF_POP(t) ERING_POP(&(t)->reader.ring)
+#define TERM_HISTORY_COUNT(t) ERING_USED(&(t)->history)
 
 
 int
@@ -43,7 +55,7 @@ term_deinit(struct term *term);
 
 
 ASYNC
-term_readA(struct uaio_task *self, struct term *term, struct cmd *out);
+term_readA(struct uaio_task *self, struct term *term);
 
 
 #endif

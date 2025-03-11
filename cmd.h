@@ -17,6 +17,7 @@ typedef struct cmd {
 
 #define cmd_avail(s) ((s)->size - (s)->len)
 #define cmd_isfull(s) (cmd_avail(s) == 0)
+#define cmd_isempty(s) ((s)->len == 0)
 #define cmd_clear(s) (s)->len = 0
 #define cmd_compare(a, b) \
     strncmp((a)->buff, (b)->buff, MAX((a)->len, (b)->len))

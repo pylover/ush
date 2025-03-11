@@ -30,4 +30,8 @@ menu "ush"
 		string "shell prompt"
 		default "esp32"
 
+	config USH_VI
+		bool "enable vi editing mode"
+		default y
+
 endmenu

@@ -17,11 +17,7 @@
 #undef UAIO_ARG2
 #undef UAIO_ENTITY
 #define UAIO_ENTITY term
-#define UAIO_ARG1 struct cmd*
 #include "uaio_generic.c"
-
-
-#define CMDLINE(t) ERING_HEADPTROFF(&(t)->history, (t)->rotation)
 
 
 static int
@@ -40,7 +36,7 @@ static void
 _cursor_move(struct term *term, int cols) {
     int newcol = term->col + cols;
 
-    if ((newcol < 0) || (newcol > CMDLINE(term)->len)) {
+    if ((newcol < 0) || (newcol > TERM_CMDLINE(term)->len)) {
         return;
     }
 
@@ -58,7 +54,7 @@ _insert(struct term *term, char c) {
     //    ^
     int i;
     int curoff;
-    struct cmd *cmd = CMDLINE(term);
+    struct cmd *cmd = TERM_CMDLINE(term);
 
     curoff = cmd->len - term->col;
 
@@ -107,7 +103,7 @@ _delete(struct term *term) {
      */
     int i;
     int curoff;
-    struct cmd *cmd = CMDLINE(term);
+    struct cmd *cmd = TERM_CMDLINE(term);
 
     /* 0 */
     if (term->col >= cmd->len) {
@@ -166,7 +162,7 @@ _backspace(struct term *term) {
      */
     int i;
     int curoff;
-    struct cmd *cmd = CMDLINE(term);
+    struct cmd *cmd = TERM_CMDLINE(term);
 
     /* 0 */
     if (!term->col) {
@@ -199,7 +195,7 @@ _backspace(struct term *term) {
 
 static void
 _rewrite(struct term *term) {
-    struct cmd *c = CMDLINE(term);
+    struct cmd *c = TERM_CMDLINE(term);
 
     if (term->col) {
         _cursor_move(term, -term->col);
@@ -233,11 +229,13 @@ static int
 _history_put(struct term *term) {
     struct cmdring *history = &term->history;
     struct cmd *first = NULL;
+    struct cmd *cmdline = TERM_CMDLINE(term);
 
     /* prevent duplicate entries in order */
     if (ERING_USED(history)) {
         first = ERING_HEADPTROFF(history, 1);
-        if (cmd_compare(first, ERING_HEADPTR(history)) == 0) {
+        if (cmd_isempty(first) || cmd_isempty(cmdline) || \
+                (cmd_compare(first, cmdline) == 0)) {
             goto done;
         }
     }
@@ -306,6 +304,10 @@ term_init(struct term *term, int infd, int outfd) {
     term->outfd = outfd;
     term->rotation = 0;
     term->col = 0;
+#ifdef CONFIG_USH_VI
+    term->mode = VI_INSERT;
+#endif  // CONFIG_USH_VI
+
     return 0;
 
 rollback:
@@ -334,8 +336,16 @@ term_deinit(struct term *term) {
     return ret;
 }
 
+
+ASYNC
+_viA(struct uaio_task *self, struct term *term) {
+    UAIO_BEGIN(self);
+    UAIO_FINALLY(self);
+}
+
+
 static ASYNC
-_escape(struct uaio_task *self, struct term *term, struct cmd *out) {
+_escape(struct uaio_task *self, struct term *term) {
     char c = 0;
     struct euart_reader *reader = &term->reader;
     struct u8ring *input = &reader->ring;
@@ -396,7 +406,7 @@ _escape(struct uaio_task *self, struct term *term, struct cmd *out) {
 
 
 ASYNC
-term_readA(struct uaio_task *self, struct term *term, struct cmd *out) {
+term_readA(struct uaio_task *self, struct term *term) {
     char c;
     struct euart_reader *reader = &term->reader;
     struct u8ring *input = &reader->ring;
@@ -404,6 +414,7 @@ term_readA(struct uaio_task *self, struct term *term, struct cmd *out) {
     UAIO_BEGIN(self);
 
 prompt:
+    _history_put(term);
     _prompt(term);
     // fflush(stdout);
 
@@ -413,9 +424,17 @@ prompt:
 
             //DEBUG("c: %d", c);
 
+#ifdef CONFIG_USH_VI
+            /* vi */
+            if (term->mode == VI_NORMAL) {
+                TERM_AWAIT(self, _viA, term);
+                continue;
+            }
+#endif  // CONFIG_USH_VI
+
             /* ansi */
             if (c == ASCII_ESC) {
-                TERM_AWAIT(self, _escape, term, NULL);
+                TERM_AWAIT(self, _escape, term);
                 continue;
             }
 
@@ -426,16 +445,14 @@ prompt:
             }
 
             if (c == ASCII_LF) {
-                cmd = CMDLINE(term);
+                cmd = TERM_CMDLINE(term);
                 if (cmd->len == 0) {
                     goto prompt;
                 }
                 if (term->rotation) {
                     term->rotation = 0;
-                    cmd_copy(CMDLINE(term), cmd);
+                    cmd_copy(TERM_CMDLINE(term), cmd);
                 }
-                cmd_copy(out, cmd);
-                _history_put(term);
                 UAIO_RETURN(self);
             }
 
