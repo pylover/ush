@@ -40,10 +40,14 @@ typedef struct term {
 
 #define TERM_AWAIT(task, coro, t) UAIO_AWAIT(task, term, coro, t)
 #define TERM_AREADLINE(task, t) TERM_AWAIT(task, term_readA, t)
-#define TERM_CMDLINE(t) ERING_HEADPTROFF(&(t)->history, (t)->rotation)
 #define TERM_INBUFF_COUNT(t) ERING_USED(&(t)->reader.ring)
 #define TERM_INBUFF_POP(t) ERING_POP(&(t)->reader.ring)
+#define TERM_CMDLINE(t) ERING_HEADPTROFF(&(t)->history, (t)->rotation)
 #define TERM_HISTORY_COUNT(t) ERING_USED(&(t)->history)
+#define TERM_HISTORY_ISFULL(t) ERING_ISFULL(&(t)->history)
+#define TERM_HISTORY_EXTEND(t) ERING_INCRHEAD(&(t)->history)
+#define TERM_HISTORY_SHRINK(t) ERING_INCRTAIL(&(t)->history)
+#define TERM_HISTORY_OFFSET(t, i) ERING_HEADPTROFF(&(t)->history, i)
 
 
 int

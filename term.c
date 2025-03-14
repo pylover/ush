@@ -209,10 +209,9 @@ _rewrite(struct term *term) {
 static int
 _history_rotate(struct term *term, int steps) {
     int r;
-    struct cmdring *history = &term->history;
 
     r = term->rotation + steps;
-    if ((r < 0) || (r > ERING_USED(history))) {
+    if ((r < 0) || (r > TERM_HISTORY_COUNT(term))) {
         return -1;
     }
 
@@ -227,35 +226,37 @@ _history_rotate(struct term *term, int steps) {
  */
 static int
 _history_put(struct term *term) {
-    struct cmdring *history = &term->history;
     struct cmd *first = NULL;
     struct cmd *cmdline = TERM_CMDLINE(term);
 
+    if (cmd_isempty(cmdline)) {
+        goto done;
+    }
+
     /* prevent duplicate entries in order */
-    if (ERING_USED(history)) {
-        first = ERING_HEADPTROFF(history, 1);
-        if (cmd_isempty(first) || cmd_isempty(cmdline) || \
-                (cmd_compare(first, cmdline) == 0)) {
+    if (TERM_HISTORY_COUNT(term)) {
+        first = TERM_HISTORY_OFFSET(term, 1);
+        if (cmd_isempty(first) || (cmd_compare(first, cmdline) == 0)) {
             goto done;
         }
     }
 
     /* reuse the last item if possible */
-    if (ERING_ISFULL(history)) {
-        ERING_INCRTAIL(history);
-        ERING_INCRHEAD(history);
+    if (TERM_HISTORY_ISFULL(term)) {
+        TERM_HISTORY_SHRINK(term);
+        TERM_HISTORY_EXTEND(term);
         goto done;
     }
 
-    /* initialize and allocate the first item of the history */
-    ERING_INCRHEAD(history);
-    if (cmd_init(ERING_HEADPTR(history), CONFIG_USH_TERM_LINESIZE)) {
-        ERING_DECRHEAD(history);
+    /* initialize and allocate the first item of the history (aka cmdline) */
+    TERM_HISTORY_EXTEND(term);
+    if (cmd_init(TERM_HISTORY_OFFSET(term, 0), CONFIG_USH_TERM_LINESIZE)) {
+        ERING_DECRHEAD(&term->history);
         return -1;
     }
 
 done:
-    ERING_HEADPTR(history)->len = 0;
+    TERM_HISTORY_OFFSET(term, 0)->len = 0;
     term->col = 0;
     return 0;
 }
@@ -326,7 +327,7 @@ term_deinit(struct term *term) {
 
     /* flush the cmdring */
     cmd_deinit(ERING_HEADPTR(history));
-    while (ERING_USED(history)) {
+    while (TERM_HISTORY_COUNT(term)) {
         cmd_deinit(ERING_TAILPTR(history));
         ERING_INCRTAIL(history);
     }
@@ -348,14 +349,13 @@ static ASYNC
 _escape(struct uaio_task *self, struct term *term) {
     char c = 0;
     struct euart_reader *reader = &term->reader;
-    struct u8ring *input = &reader->ring;
     UAIO_BEGIN(self);
 
     EUART_AREADT(self, reader, 3, CONFIG_USH_TERM_READER_TIMEOUT_US);
-    if (ERING_USED(input) < 2) {
+    if (TERM_INBUFF_COUNT(term) < 2) {
         UAIO_RETURN(self);
     }
-    c = ERING_POP(input);
+    c = TERM_INBUFF_POP(term);
 
     /* ansi control */
     if (c != '[') {
@@ -363,17 +363,17 @@ _escape(struct uaio_task *self, struct term *term) {
         UAIO_RETURN(self);
     }
 
-    if (ERING_ISEMPTY(input)) {
+    if (TERM_INBUFF_COUNT(term) == 0) {
         UAIO_RETURN(self);
     }
-    c = ERING_POP(input);
+    c = TERM_INBUFF_POP(term);
 
     /* delete */
     if (c == '3') {
-        if (ERING_ISEMPTY(input)) {
+        if (TERM_INBUFF_COUNT(term) == 0) {
             UAIO_RETURN(self);
         }
-        c = ERING_POP(input);
+        c = TERM_INBUFF_POP(term);
         if (c == 126) {
             _delete(term);
             UAIO_RETURN(self);
@@ -409,7 +409,6 @@ ASYNC
 term_readA(struct uaio_task *self, struct term *term) {
     char c;
     struct euart_reader *reader = &term->reader;
-    struct u8ring *input = &reader->ring;
     struct cmd *cmd;
     UAIO_BEGIN(self);
 
@@ -419,8 +418,8 @@ prompt:
     // fflush(stdout);
 
     while (true) {
-        while (ERING_USED(input)) {
-            c = ERING_POP(input);
+        while (TERM_INBUFF_COUNT(term)) {
+            c = TERM_INBUFF_POP(term);
 
             //DEBUG("c: %d", c);
 
