@@ -42,6 +42,8 @@ typedef struct term {
 #define TERM_AREADLINE(task, t) TERM_AWAIT(task, term_readA, t)
 #define TERM_INBUFF_COUNT(t) ERING_USED(&(t)->reader.ring)
 #define TERM_INBUFF_POP(t) ERING_POP(&(t)->reader.ring)
+#define TERM_INBUFF_GET(t) ERING_GET(&(t)->reader.ring)
+#define TERM_INBUFF_SKIP(t, n) ERING_SKIP(&(t)->reader.ring, n)
 #define TERM_CMDLINE(t) ERING_HEADPTROFF(&(t)->history, (t)->rotation)
 #define TERM_HISTORY_COUNT(t) ERING_USED(&(t)->history)
 #define TERM_HISTORY_ISFULL(t) ERING_ISFULL(&(t)->history)

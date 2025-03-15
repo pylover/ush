@@ -251,7 +251,7 @@ _history_put(struct term *term) {
     /* initialize and allocate the first item of the history (aka cmdline) */
     TERM_HISTORY_EXTEND(term);
     if (cmd_init(TERM_HISTORY_OFFSET(term, 0), CONFIG_USH_TERM_LINESIZE)) {
-        ERING_DECRHEAD(&term->history);
+        TERM_HISTORY_EXTEND(term);
         return -1;
     }
 
@@ -298,7 +298,7 @@ term_init(struct term *term, int infd, int outfd) {
     }
 
     /* initialize and allocate the first item of the history */
-    if (cmd_init(ERING_HEADPTR(&term->history), CONFIG_USH_TERM_LINESIZE)) {
+    if (cmd_init(TERM_HISTORY_OFFSET(term, 0), CONFIG_USH_TERM_LINESIZE)) {
         goto rollback;
     }
 
@@ -340,7 +340,23 @@ term_deinit(struct term *term) {
 
 ASYNC
 _viA(struct uaio_task *self, struct term *term) {
+    char c;
     UAIO_BEGIN(self);
+    EUART_AREADT(self, &term->reader, 3, CONFIG_USH_TERM_READER_TIMEOUT_US);
+    if (!TERM_INBUFF_COUNT(term)) {
+        UAIO_RETURN(self);
+    }
+
+    c = TERM_INBUFF_POP(term);
+    switch (c) {
+        case 'i':
+            term->mode = VI_INSERT;
+            break;
+        case ASCII_ESC:
+            term->mode = VI_NORMAL;
+            break;
+
+    }
     UAIO_FINALLY(self);
 }
 
@@ -348,10 +364,9 @@ _viA(struct uaio_task *self, struct term *term) {
 static ASYNC
 _escape(struct uaio_task *self, struct term *term) {
     char c = 0;
-    struct euart_reader *reader = &term->reader;
     UAIO_BEGIN(self);
 
-    EUART_AREADT(self, reader, 3, CONFIG_USH_TERM_READER_TIMEOUT_US);
+    EUART_AREADT(self, &term->reader, 3, CONFIG_USH_TERM_READER_TIMEOUT_US);
     if (TERM_INBUFF_COUNT(term) < 2) {
         UAIO_RETURN(self);
     }
@@ -408,20 +423,25 @@ _escape(struct uaio_task *self, struct term *term) {
 ASYNC
 term_readA(struct uaio_task *self, struct term *term) {
     char c;
-    struct euart_reader *reader = &term->reader;
     struct cmd *cmd;
     UAIO_BEGIN(self);
 
 prompt:
     _history_put(term);
     _prompt(term);
-    // fflush(stdout);
 
     while (true) {
         while (TERM_INBUFF_COUNT(term)) {
-            c = TERM_INBUFF_POP(term);
+            c = TERM_INBUFF_GET(term);
 
             //DEBUG("c: %d", c);
+
+            /* ansi */
+            if (c == ASCII_ESC) {
+                TERM_INBUFF_SKIP(term, 1);
+                TERM_AWAIT(self, _escape, term);
+                continue;
+            }
 
 #ifdef CONFIG_USH_VI
             /* vi */
@@ -431,11 +451,8 @@ prompt:
             }
 #endif  // CONFIG_USH_VI
 
-            /* ansi */
-            if (c == ASCII_ESC) {
-                TERM_AWAIT(self, _escape, term);
-                continue;
-            }
+            /* No need to more examination, delete the char from buffer */
+            TERM_INBUFF_SKIP(term, 1);
 
             /* backspace */
             if (ASCII_ISBACKSPACE(c)) {
@@ -460,7 +477,7 @@ prompt:
             }
         }
         fsync(term->outfd);
-        EUART_AREAD(self, reader, 1);
+        EUART_AREAD(self, &term->reader, 1);
     }
 
     UAIO_FINALLY(self);

@@ -67,20 +67,18 @@ ush_destroy(struct ush *sh) {
 ASYNC
 ushA(struct uaio_task *self, struct ush *sh) {
     struct term *term = &sh->term;
-    // struct cmd *cmd = &sh->executing;
-    struct cmd *cmd;
+    struct cmd *cmd = &sh->executing;
     UAIO_BEGIN(self);
 
     /* loop */
     while (true) {
-        // cmd_clear(cmd);
+        cmd_clear(cmd);
         TERM_AREADLINE(self, term);
         if (UAIO_HASERROR(self)) {
             ERROR("term read error");
             continue;
         }
-        cmd = TERM_CMDLINE(term);
-        // cmd_copy(out, cmd);
+        cmd_copy(cmd, TERM_CMDLINE(term));
         DEBUG("command: %.*s", cmd->len, cmd->buff);
     }
 
