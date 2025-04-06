@@ -101,20 +101,14 @@ _delete(struct term *term) {
      * 0 abc   abc
      *   ^     ^
      */
-    int i;
+    /* 0 */
     int curoff;
     struct cmd *cmd = TERM_CMDLINE(term);
 
-    /* 0 */
-    if (term->col >= cmd->len) {
+    /* 1 */
+    if (cmd_delete(cmd, term->col)) {
         return;
     }
-
-    /* 1 */
-    for (i = term->col + 1; i < cmd->len; i++) {
-        cmd->buff[i - 1] = cmd->buff[i];
-    }
-    cmd->len--;
 
     /* 2 */
     curoff = cmd->len - term->col;
@@ -160,21 +154,19 @@ _backspace(struct term *term) {
      * 3 ab     ab
      *     ^      ^
      */
-    int i;
+    /* 0 */
     int curoff;
     struct cmd *cmd = TERM_CMDLINE(term);
 
-    /* 0 */
     if (!term->col) {
         return;
     }
 
     /* 1 */
-    for (i = term->col; i < cmd->len; i++) {
-        cmd->buff[i - 1] = cmd->buff[i];
+    if (cmd_delete(cmd, term->col - 1)) {
+        return;
     }
     term->col--;
-    cmd->len--;
 
     /* 2 */
     write(term->outfd, "\b", 1);
