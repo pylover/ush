@@ -52,30 +52,20 @@ _insert(struct term *term, char c) {
     //    ^
     // abc defgh
     //    ^
-    int i;
-    int curoff;
+    int dirty;
     struct cmd *cmd = TERM_CMDLINE(term);
 
-    curoff = cmd->len - term->col;
-
-    if (cmd->len == CONFIG_USH_TERM_LINESIZE) {
+    if (cmd_insert(cmd, c, term->col)) {
         return -1;
     }
 
-    if (curoff) {
-        for (i = cmd->len - 1; i >= term->col; i--) {
-            cmd->buff[i + 1] = cmd->buff[i];
-        }
-    }
-
-    cmd->buff[term->col] = c;
-    cmd->len++;
     write(term->outfd, &c, 1);
     term->col++;
 
-    if (curoff) {
-        write(term->outfd, cmd->buff + term->col, curoff);
-        _printf(term, "%c[%dD", ASCII_ESC, abs(curoff));
+    dirty = cmd->len - term->col;
+    if (dirty) {
+        write(term->outfd, cmd_ptroff(cmd, term->col), dirty);
+        _printf(term, "%c[%dD", ASCII_ESC, abs(dirty));
     }
 
     return 0;
@@ -113,7 +103,7 @@ _delete(struct term *term) {
     /* 2 */
     curoff = cmd->len - term->col;
     if (curoff) {
-        write(term->outfd, cmd->buff + term->col, curoff);
+        write(term->outfd, cmd_ptroff(cmd, term->col), curoff);
     }
 
     write(term->outfd, " \b", 2);
@@ -172,7 +162,7 @@ _backspace(struct term *term) {
     write(term->outfd, "\b", 1);
     curoff = cmd->len - term->col;
     if (curoff) {
-        write(term->outfd, cmd->buff + term->col, curoff);
+        write(term->outfd, cmd_ptroff(cmd, term->col), curoff);
     }
 
     /* 3 */
@@ -187,14 +177,14 @@ _backspace(struct term *term) {
 
 static void
 _rewrite(struct term *term) {
-    struct cmd *c = TERM_CMDLINE(term);
+    struct cmd *cmd = TERM_CMDLINE(term);
 
     if (term->col) {
         _cursor_move(term, -term->col);
     }
 
-    _printf(term, "%s%.*s", ANSI_ERASETOEND, c->len, c->buff);
-    term->col = c->len;
+    _printf(term, "%s%.*s", ANSI_ERASETOEND, cmd->len, cmd_ptr(cmd));
+    term->col = cmd->len;
 }
 
 

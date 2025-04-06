@@ -15,12 +15,14 @@ typedef struct cmd {
 } cmd_t;
 
 
-#define cmd_avail(s) ((s)->size - (s)->len)
-#define cmd_isfull(s) (cmd_avail(s) == 0)
-#define cmd_isempty(s) ((s)->len == 0)
-#define cmd_clear(s) (s)->len = 0
-#define cmd_compare(a, b) \
-    strncmp((a)->buff, (b)->buff, MAX((a)->len, (b)->len))
+#define cmd_avail(c) ((c)->size - (c)->len)
+#define cmd_isfull(c) (cmd_avail(c) == 0)
+#define cmd_isempty(c) ((c)->len == 0)
+#define cmd_clear(c) (c)->len = 0
+#define cmd_compare(c1, c2) \
+    strncmp((c1)->buff, (c2)->buff, MAX((c1)->len, (c2)->len))
+#define cmd_ptroff(c, i) ((c)->buff + (i))
+#define cmd_ptr(c) (c)->buff
 
 
 int
@@ -33,6 +35,10 @@ cmd_deinit(struct cmd *s);
 
 int
 cmd_append(struct cmd *s, char c);
+
+
+int
+cmd_insert(struct cmd *c, char ch, int index);
 
 
 int
