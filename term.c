@@ -20,6 +20,22 @@
 #include "uaio_generic.c"
 
 
+#ifdef CONFIG_USH_VI
+
+#define vi_inserting(t) ((t)->mode == VI_INSERT)
+
+static void
+_vi_switch(struct term *term, enum vi_mode mode) {
+    if (term->mode == mode) {
+        return;
+    }
+    DEBUG("VI: Switched to %s mode", mode == VI_INSERT? "insert": "normal");
+    term->mode = mode;
+}
+
+#endif  // CONFIG_USH_VI
+
+
 static int
 _printf(struct term *term, const char *restrict fmt, ...) {
     int ret;
@@ -35,8 +51,8 @@ _printf(struct term *term, const char *restrict fmt, ...) {
 static void
 _cursor_move(struct term *term, int cols) {
     int newcol = term->col + cols;
-
-    if ((newcol < 0) || (newcol > TERM_CMDLINE(term)->len)) {
+    if ((newcol < 0) || (newcol > TERM_CMDLINE(term)->len) ||
+            (newcol == term->col)) {
         return;
     }
 
@@ -289,7 +305,7 @@ term_init(struct term *term, int infd, int outfd) {
     term->rotation = 0;
     term->col = 0;
 #ifdef CONFIG_USH_VI
-    term->mode = VI_INSERT;
+    _vi_switch(term, VI_INSERT);
 #endif  // CONFIG_USH_VI
 
     return 0;
@@ -330,16 +346,38 @@ _viA(struct uaio_task *self, struct term *term) {
         UAIO_RETURN(self);
     }
 
-    c = TERM_INBUFF_POP(term);
+    c = TERM_INBUFF_GET(term);
+    if (c == ASCII_LF) {
+        _vi_switch(term, VI_INSERT);
+        UAIO_RETURN(self);
+    }
+
+    TERM_INBUFF_SKIP(term, 1);
     switch (c) {
         case 'i':
-            term->mode = VI_INSERT;
+            _vi_switch(term, VI_INSERT);
             break;
-        case ASCII_ESC:
-            term->mode = VI_NORMAL;
+        case 'k':
+            if (!_history_rotate(term, 1)) {
+                _cursor_move(term, -term->col);
+            }
             break;
-
+        case 'j':
+            if (!_history_rotate(term, -1)) {
+                _cursor_move(term, -term->col);
+            }
+            break;
+        case 'l':
+            _cursor_move(term, 1);
+            break;
+        case 'h':
+            _cursor_move(term, -1);
+            break;
+        default:
+            WARN("vi command: %c is not supported", c);
+            break;
     }
+
     UAIO_FINALLY(self);
 }
 
@@ -422,6 +460,12 @@ prompt:
             /* ansi */
             if (c == ASCII_ESC) {
                 TERM_INBUFF_SKIP(term, 1);
+#ifdef CONFIG_USH_VI
+                if (term->mode == VI_INSERT) {
+                    _vi_switch(term, VI_NORMAL);
+                    continue;
+                }
+#endif  // CONFIG_USH_VI
                 TERM_AWAIT(self, _escape, term);
                 continue;
             }
