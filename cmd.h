@@ -12,6 +12,7 @@ typedef struct cmd {
     size_t size;
     size_t len;
     char *buff;
+    char *back;
 } cmd_t;
 
 
@@ -47,6 +48,14 @@ cmd_delete(struct cmd *s, int index);
 
 int
 cmd_copy(struct cmd *dst, struct cmd *src);
+
+
+void
+cmd_commit(struct cmd *c);
+
+
+void
+cmd_restore(struct cmd *c);
 
 
 #endif  // CMD_H_

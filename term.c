@@ -197,6 +197,7 @@ _history_rotate(struct term *term, int steps) {
         return -1;
     }
 
+    cmd_commit(TERM_CMDLINE(term));
     term->rotation += steps;
     _rewrite(term);
     return 0;
@@ -442,6 +443,7 @@ prompt:
                 continue;
             }
 
+            /* enter */
             if (c == ASCII_LF) {
                 cmd = TERM_CMDLINE(term);
                 if (cmd->len == 0) {
@@ -450,6 +452,7 @@ prompt:
                 if (term->rotation) {
                     term->rotation = 0;
                     cmd_copy(TERM_CMDLINE(term), cmd);
+                    cmd_restore(cmd);
                 }
                 UAIO_RETURN(self);
             }
