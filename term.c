@@ -20,22 +20,6 @@
 #include "uaio_generic.c"
 
 
-#ifdef CONFIG_USH_VI
-
-#define vi_inserting(t) ((t)->mode == VI_INSERT)
-
-static void
-_vi_switch(struct term *term, enum vi_mode mode) {
-    if (term->mode == mode) {
-        return;
-    }
-    DEBUG("VI: Switched to %s mode", mode == VI_INSERT? "insert": "normal");
-    term->mode = mode;
-}
-
-#endif  // CONFIG_USH_VI
-
-
 static int
 _printf(struct term *term, const char *restrict fmt, ...) {
     int ret;
@@ -51,14 +35,45 @@ _printf(struct term *term, const char *restrict fmt, ...) {
 static void
 _cursor_move(struct term *term, int cols) {
     int newcol = term->col + cols;
-    if ((newcol < 0) || (newcol > TERM_CMDLINE(term)->len) ||
-            (newcol == term->col)) {
+    int maxcol = TERM_CMDLINE(term)->len;
+    int steps;
+
+    if (term->mode == VI_NORMAL) {
+        maxcol = MAX(0, maxcol - 1);
+    }
+
+    if (newcol < 0) {
+        newcol = 0;
+    }
+    else if (newcol > maxcol) {
+        newcol = maxcol;
+    }
+
+    steps = newcol - term->col;
+    if (!steps) {
         return;
     }
 
-    _printf(term, "%c[%d%c", ASCII_ESC, abs(cols), cols < 0? 'D': 'C');
+    _printf(term, "%c[%d%c", ASCII_ESC, abs(steps), steps < 0? 'D': 'C');
     term->col = newcol;
 }
+
+
+
+#define vi_inserting(t) ((t)->mode == VI_INSERT)
+
+static void
+_vi_switch(struct term *term, enum vi_mode mode) {
+    if (term->mode == mode) {
+        return;
+    }
+    DEBUG("VI: Switched to %s mode", mode == VI_INSERT? "insert": "normal");
+    term->mode = mode;
+    if ((mode == VI_NORMAL) && term->col) {
+        _cursor_move(term, -1);
+    }
+}
+
 
 
 static int
@@ -304,9 +319,8 @@ term_init(struct term *term, int infd, int outfd) {
     term->outfd = outfd;
     term->rotation = 0;
     term->col = 0;
-#ifdef CONFIG_USH_VI
     _vi_switch(term, VI_INSERT);
-#endif  // CONFIG_USH_VI
+    term->vi_repeat = 0;
 
     return 0;
 
@@ -341,10 +355,9 @@ ASYNC
 _viA(struct uaio_task *self, struct term *term) {
     char c;
     UAIO_BEGIN(self);
+
+aread:
     EUART_AREADT(self, &term->reader, 3, CONFIG_USH_TERM_READER_TIMEOUT_US);
-    if (!TERM_INBUFF_COUNT(term)) {
-        UAIO_RETURN(self);
-    }
 
     c = TERM_INBUFF_GET(term);
     if (c == ASCII_LF) {
@@ -353,90 +366,134 @@ _viA(struct uaio_task *self, struct term *term) {
     }
 
     TERM_INBUFF_SKIP(term, 1);
+
+    if (ASCII_IS1TO9(c)) {
+        if (term->vi_repeat) {
+            term->vi_repeat *= 10;
+        }
+        term->vi_repeat += c - '0';
+        DEBUG("VI: repeat: %d", term->vi_repeat);
+        goto aread;
+    }
+
+    if (!term->vi_repeat) {
+        term->vi_repeat = 1;
+    }
+
+    DEBUG("VI: repeat: %d", term->vi_repeat);
+
     switch (c) {
         case 'i':
             _vi_switch(term, VI_INSERT);
             break;
+
         case 'k':
-            if (!_history_rotate(term, 1)) {
+            if (!_history_rotate(term, term->vi_repeat)) {
+                // TODO: curosr_end
                 _cursor_move(term, -term->col);
             }
             break;
+
         case 'j':
-            if (!_history_rotate(term, -1)) {
+            if (!_history_rotate(term, -term->vi_repeat)) {
+                // TODO: curosr_end
                 _cursor_move(term, -term->col);
             }
             break;
+
         case 'l':
-            _cursor_move(term, 1);
+            _cursor_move(term, term->vi_repeat);
             break;
+
         case 'h':
-            _cursor_move(term, -1);
+            _cursor_move(term, -term->vi_repeat);
             break;
+
+        case '0':
+            // TODO: curosr_first
+            _cursor_move(term, -term->col);
+            break;
+
+        case '$':
+            // TODO: curosr_end
+            _cursor_move(term, TERM_CMDLINE(term)->len);
+            break;
+
         default:
             WARN("vi command: %c is not supported", c);
             break;
     }
 
+    term->vi_repeat = 0;
     UAIO_FINALLY(self);
 }
 
 
 static ASYNC
 _escape(struct uaio_task *self, struct term *term) {
+    int skip = 0;
     char c = 0;
     UAIO_BEGIN(self);
 
-    EUART_AREADT(self, &term->reader, 3, CONFIG_USH_TERM_READER_TIMEOUT_US);
-    if (TERM_INBUFF_COUNT(term) < 2) {
-        UAIO_RETURN(self);
+    EUART_AREADT(self, &term->reader, 4, CONFIG_USH_TERM_READER_TIMEOUT_US);
+    if (TERM_INBUFF_COUNT(term) < 3) {
+        goto insufficient;
     }
-    c = TERM_INBUFF_POP(term);
 
-    /* ansi control */
+    /* ansi control: [ */
+    c = TERM_INBUFF_GETOFF(term, 1);
     if (c != '[') {
-        WARN("escape sequence not supported: %d", c);
-        UAIO_RETURN(self);
+        goto notsupported;
     }
 
-    if (TERM_INBUFF_COUNT(term) == 0) {
-        UAIO_RETURN(self);
-    }
-    c = TERM_INBUFF_POP(term);
+    /* skip ESC and [ */
+    skip += 2;
 
-    /* delete */
+    /* ansi command */
+    c = TERM_INBUFF_GETOFF(term, 2);
+
+    /* delete ^[3~ */
     if (c == '3') {
-        if (TERM_INBUFF_COUNT(term) == 0) {
-            UAIO_RETURN(self);
+        if ((TERM_INBUFF_COUNT(term) <= 3) ||
+                TERM_INBUFF_GETOFF(term, 3) != '~') {
+            goto notsupported;
         }
-        c = TERM_INBUFF_POP(term);
-        if (c == 126) {
-            _delete(term);
-            UAIO_RETURN(self);
-        }
-        WARN("escape sequence not supported: ^[3%d", c);
-        UAIO_RETURN(self);
+
+        _delete(term);
+        skip += 2;
+        goto eat;
     }
 
     switch (c) {
         case 'A':
             _history_rotate(term, 1);
+            skip++;
             break;
         case 'B':
             _history_rotate(term, -1);
+            skip++;
             break;
         case 'C':
             _cursor_move(term, 1);
+            skip++;
             break;
         case 'D':
             _cursor_move(term, -1);
+            skip++;
             break;
         default:
-            WARN("escape sequence: %c is not supported", c);
-            break;
+            goto notsupported;
     }
 
+    goto eat;
 
+
+insufficient:
+notsupported:
+    UAIO_THROW2(self, EINVAL);
+
+eat:
+    TERM_INBUFF_SKIP(term, skip);
     UAIO_FINALLY(self);
 }
 
@@ -452,33 +509,32 @@ prompt:
     _prompt(term);
 
     while (true) {
+        /* insert mode */
         while (TERM_INBUFF_COUNT(term)) {
             c = TERM_INBUFF_GET(term);
-
             //DEBUG("c: %d", c);
 
-            /* ansi */
-            if (c == ASCII_ESC) {
-                TERM_INBUFF_SKIP(term, 1);
-#ifdef CONFIG_USH_VI
-                if (term->mode == VI_INSERT) {
-                    _vi_switch(term, VI_NORMAL);
-                    continue;
-                }
-#endif  // CONFIG_USH_VI
-                TERM_AWAIT(self, _escape, term);
-                continue;
-            }
-
-#ifdef CONFIG_USH_VI
             /* vi */
             if (term->mode == VI_NORMAL) {
+                /* normal mode */
                 TERM_AWAIT(self, _viA, term);
                 continue;
             }
-#endif  // CONFIG_USH_VI
 
-            /* No need to more examination, delete the char from buffer */
+            /* escape pressed */
+            if (c == ASCII_ESC) {
+                /* try ansi escape */
+                TERM_AWAIT(self, _escape, term);
+                if (UAIO_HASERROR(self)) {
+                    /* ESC is not eaten by _escape, switch to normal mode */
+                    _vi_switch(term, VI_NORMAL);
+                    TERM_INBUFF_SKIP(term, 1);
+                }
+
+                continue;
+            }
+
+            /* no need to more examination, delete the char from buffer */
             TERM_INBUFF_SKIP(term, 1);
 
             /* backspace */
@@ -501,6 +557,7 @@ prompt:
                 UAIO_RETURN(self);
             }
 
+            /* insert char */
             if (_insert(term, c)) {
                 UAIO_THROW2(self, ENOBUFS);
             }

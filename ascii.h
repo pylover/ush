@@ -19,6 +19,10 @@
 #define ASCII_ISBACKSPACE(c) ((c == 8) || (c == 127))
 
 
+#define ASCII_ISDIGIT(c) ((c >= 48) && (c <= 57))
+#define ASCII_IS1TO9(c) ((c >= 49) && (c <= 57))
+
+
 /** ASCII control characters (character code 0-31)
  * The first 32 characters in the ASCII-table are unprintable control codes
  * and are used to control peripherals such as printers.
