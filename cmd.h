@@ -22,8 +22,8 @@ typedef struct cmd {
 #define cmd_clear(c) (c)->len = 0
 #define cmd_compare(c1, c2) \
     strncmp((c1)->buff, (c2)->buff, MAX((c1)->len, (c2)->len))
-#define cmd_ptroff(c, i) ((c)->buff + (i))
 #define cmd_ptr(c) (c)->buff
+#define cmd_ptroff(c, off) ((c)->buff + (off))
 
 
 int
@@ -42,8 +42,16 @@ int
 cmd_insert(struct cmd *c, char ch, int index);
 
 
+/** Deletes one or more characters.
+ *
+ * if index is less than zero, then the index is enumerated from the end of the
+ * command, and if count is less than zero, then characters will be deleted
+ * backward.
+ *
+ * returns the dirty portion index.
+ * */
 int
-cmd_delete(struct cmd *s, int index);
+cmd_delete(struct cmd *s, int index, int count);
 
 
 int

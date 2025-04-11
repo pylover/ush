@@ -1,3 +1,4 @@
+- vi: x, a
 - optimize some printfs with write(2)
 - banner
 - lint

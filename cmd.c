@@ -134,10 +134,11 @@ cmd_insert(struct cmd *c, char ch, int index) {
 
 
 int
-cmd_delete(struct cmd *c, int index) {
-    int last;
+cmd_delete(struct cmd *c, int index, int count) {
+    int toindex;
+    int i;
 
-    if (c->len == 0) {
+    if (!c->len || !count) {
         return -1;
     }
 
@@ -150,23 +151,30 @@ cmd_delete(struct cmd *c, int index) {
         index += c->len;
     }
 
-    last = c->len - 1;
-    if ((index < 0) || (index > last)) {
-        return -1;
+    toindex = index + count;
+    toindex = MAX(toindex, 0);
+    toindex = MIN(toindex, c->len);
+
+    if (toindex < index) {
+        /* swap values to perform backward removal */
+        index ^= toindex;
+        toindex ^= index;
+        index ^= toindex;
     }
+    count = toindex - index;
 
     /* shift left */
     /* 012345
-     * abcde
+     * abcd
      *    ^
-     * abce
+     * abc
      */
-    for (; index < last; index++) {
-        c->buff[index] = c->buff[index + 1];
+    for (i = index; i < (c->len - count); i++) {
+        c->buff[i] = c->buff[i + count];
     }
-    c->len--;
+    c->len -= count;
 
-    return 0;
+    return index;
 }
 
 

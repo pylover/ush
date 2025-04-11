@@ -67,7 +67,8 @@ _vi_switch(struct term *term, enum vi_mode mode) {
     if (term->mode == mode) {
         return;
     }
-    DEBUG("VI: Switched to %s mode", mode == VI_INSERT? "insert": "normal");
+    DEBUG("VI: Switched to %s mode, col: %d",
+            mode == VI_INSERT? "insert": "normal", term->col);
     term->mode = mode;
     if ((mode == VI_NORMAL) && term->col) {
         _cursor_move(term, -1);
@@ -104,54 +105,59 @@ _insert(struct term *term, char c) {
 
 
 static void
-_delete(struct term *term) {
-    /*   buffer     terminal
-     *   01234567   01234567
-     * 0 abcdefgh   abcdefgh
-     *       ^          ^
-     * 1 abcdfgh    abcdefgh
-     *       ^          ^
-     * 2 abcdfgh    abcdfghh
-     *       ^             ^
-     * 3 abcdfgh    abcdfgh
-     *       ^             ^
-     * 4 abcdfgh    abcdfgh
-     *       ^          ^
-     *
-     *   012   012
-     * 0 abc   abc
-     *   ^     ^
-     */
-    /* 0 */
-    int curoff;
+_rewrite(struct term *term, int index) {
     struct cmd *cmd = TERM_CMDLINE(term);
 
-    /* 1 */
-    if (cmd_delete(cmd, term->col)) {
-        return;
+    index = MAX(0, index);
+    index = MIN(cmd->len - 1, index);
+
+    if (term->col != index) {
+        _cursor_move(term, index - term->col);
     }
 
-    /* 2 */
-    curoff = cmd->len - term->col;
-    if (curoff) {
-        write(term->outfd, cmd_ptroff(cmd, term->col), curoff);
-    }
-
-    write(term->outfd, " \b", 2);
-    if (!curoff) {
-        return;
-    }
-
-    /* 3 */
-    write(term->outfd, " \b", 2);
-
-    /* 4 */
-    _printf(term, "%c[%dD", ASCII_ESC, abs(curoff));
+    DEBUG("index; %d, cmdlen: %d, %.*s", index, cmd->len,
+            cmd->len, cmd_ptr(cmd));
+    _printf(term, "%s%.*s", ANSI_ERASETOEND, (cmd->len - index),
+            cmd_ptroff(cmd, index));
+    term->col = cmd->len;
 }
 
 
 static void
-_backspace(struct term *term) {
+_delete(struct term *term, unsigned int count) {
+    /*   buffer     terminal
+     *   01234567   01234567
+     * 0 abcdefgh   abcdefgh   _delete(2)
+     *       ^          ^
+     * 1 abcdgh     abcdefgh
+     *       ^          ^
+     * 2 abcdgh     abcdgh
+     *       ^            ^
+     * 3 abcdgh     abcdgh
+     *       ^          ^
+     *
+     */
+    /* 0 */
+    int dirty;
+    struct cmd *cmd = TERM_CMDLINE(term);
+
+    /* 1 */
+    dirty = cmd_delete(cmd, term->col, count);
+    if (dirty == -1) {
+        return;
+    }
+
+    /* 2 */
+    DEBUG("dirty: %d", dirty);
+    _rewrite(term, dirty);
+
+    /* 3 */
+    _cursor_move(term, dirty - term->col);
+}
+
+
+static void
+_backspace(struct term *term, int count) {
     /*   buffer     terminal
      *   01234567   01234567
      * 0 abcdefgh   abcdefgh
@@ -176,7 +182,7 @@ _backspace(struct term *term) {
      *     ^      ^
      */
     /* 0 */
-    int curoff;
+    int dirty;
     struct cmd *cmd = TERM_CMDLINE(term);
 
     if (!term->col) {
@@ -184,38 +190,16 @@ _backspace(struct term *term) {
     }
 
     /* 1 */
-    if (cmd_delete(cmd, term->col - 1)) {
+    dirty = cmd_delete(cmd, term->col, -count);
+    if (dirty == -1) {
         return;
     }
-    term->col--;
 
     /* 2 */
-    write(term->outfd, "\b", 1);
-    curoff = cmd->len - term->col;
-    if (curoff) {
-        write(term->outfd, cmd_ptroff(cmd, term->col), curoff);
-    }
+    _rewrite(term, dirty);
 
     /* 3 */
-    write(term->outfd, " \b", 2);
-
-    /* 4 */
-    if (curoff) {
-        _printf(term, "%c[%dD", ASCII_ESC, abs(curoff));
-    }
-}
-
-
-static void
-_rewrite(struct term *term) {
-    struct cmd *cmd = TERM_CMDLINE(term);
-
-    if (term->col) {
-        _cursor_move(term, -term->col);
-    }
-
-    _printf(term, "%s%.*s", ANSI_ERASETOEND, cmd->len, cmd_ptr(cmd));
-    term->col = cmd->len;
+    _cursor_move(term, dirty - term->col);
 }
 
 
@@ -230,7 +214,7 @@ _history_rotate(struct term *term, int steps) {
 
     cmd_commit(TERM_CMDLINE(term));
     term->rotation += steps;
-    _rewrite(term);
+    _rewrite(term, 0);
     return 0;
 }
 
@@ -358,6 +342,9 @@ _viA(struct uaio_task *self, struct term *term) {
 
 aread:
     EUART_AREADT(self, &term->reader, 3, CONFIG_USH_TERM_READER_TIMEOUT_US);
+    if (TERM_INBUFF_COUNT(term) < 1) {
+        UAIO_RETURN(self);
+    }
 
     c = TERM_INBUFF_GET(term);
     if (c == ASCII_LF) {
@@ -389,14 +376,12 @@ aread:
 
         case 'k':
             if (!_history_rotate(term, term->vi_repeat)) {
-                // TODO: curosr_end
                 _cursor_move(term, -term->col);
             }
             break;
 
         case 'j':
             if (!_history_rotate(term, -term->vi_repeat)) {
-                // TODO: curosr_end
                 _cursor_move(term, -term->col);
             }
             break;
@@ -410,13 +395,20 @@ aread:
             break;
 
         case '0':
-            // TODO: curosr_first
             _cursor_move(term, -term->col);
             break;
 
         case '$':
-            // TODO: curosr_end
             _cursor_move(term, TERM_CMDLINE(term)->len);
+            break;
+
+        case 'a':
+            _vi_switch(term, VI_INSERT);
+            _cursor_move(term, 1);
+            break;
+
+        case 'x':
+            _delete(term, term->vi_repeat);
             break;
 
         default:
@@ -447,7 +439,7 @@ _escape(struct uaio_task *self, struct term *term) {
     }
 
     /* skip ESC and [ */
-    skip += 2;
+    skip = 2;
 
     /* ansi command */
     c = TERM_INBUFF_GETOFF(term, 2);
@@ -459,7 +451,7 @@ _escape(struct uaio_task *self, struct term *term) {
             goto notsupported;
         }
 
-        _delete(term);
+        _delete(term, 1);
         skip += 2;
         goto eat;
     }
@@ -494,6 +486,7 @@ notsupported:
 
 eat:
     TERM_INBUFF_SKIP(term, skip);
+    UAIO_CLEARERROR(self);
     UAIO_FINALLY(self);
 }
 
@@ -539,7 +532,7 @@ prompt:
 
             /* backspace */
             if (ASCII_ISBACKSPACE(c)) {
-                _backspace(term);
+                _backspace(term, 1);
                 continue;
             }
 
