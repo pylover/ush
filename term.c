@@ -304,7 +304,7 @@ term_init(struct term *term, int infd, int outfd) {
     term->rotation = 0;
     term->col = 0;
     _vi_switch(term, VI_INSERT);
-    term->vi_repeat = 0;
+    term->vi_repeat = -1;
 
     return 0;
 
@@ -354,8 +354,8 @@ aread:
 
     TERM_INBUFF_SKIP(term, 1);
 
-    if (ASCII_IS1TO9(c)) {
-        if (term->vi_repeat) {
+    if (ASCII_ISDIGIT(c)) {
+        if (term->vi_repeat > 0) {
             term->vi_repeat *= 10;
         }
         term->vi_repeat += c - '0';
@@ -363,7 +363,7 @@ aread:
         goto aread;
     }
 
-    if (!term->vi_repeat) {
+    if (term->vi_repeat <= 0) {
         term->vi_repeat = 1;
     }
 
@@ -416,7 +416,7 @@ aread:
             break;
     }
 
-    term->vi_repeat = 0;
+    term->vi_repeat = -1;
     UAIO_FINALLY(self);
 }
 
