@@ -26,7 +26,7 @@ typedef struct term {
     unsigned int rotation;
     unsigned int col;
 #ifdef CONFIG_USH_VI
-    enum vi_mode mode;
+    enum vi_mode vi_mode;
     int vi_repeat;
 #endif  // CONFIG_USH_VI
 } term_t;

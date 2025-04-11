@@ -38,7 +38,7 @@ _cursor_move(struct term *term, int cols) {
     int maxcol = TERM_CMDLINE(term)->len;
     int steps;
 
-    if (term->mode == VI_NORMAL) {
+    if (term->vi_mode == VI_NORMAL) {
         maxcol = MAX(0, maxcol - 1);
     }
 
@@ -60,16 +60,16 @@ _cursor_move(struct term *term, int cols) {
 
 
 
-#define vi_inserting(t) ((t)->mode == VI_INSERT)
+#define vi_inserting(t) ((t)->vi_mode == VI_INSERT)
 
 static void
 _vi_switch(struct term *term, enum vi_mode mode) {
-    if (term->mode == mode) {
+    if (term->vi_mode == mode) {
         return;
     }
     DEBUG("VI: Switched to %s mode, col: %d",
             mode == VI_INSERT? "insert": "normal", term->col);
-    term->mode = mode;
+    term->vi_mode = mode;
     if ((mode == VI_NORMAL) && term->col) {
         _cursor_move(term, -1);
     }
@@ -338,6 +338,7 @@ term_deinit(struct term *term) {
 ASYNC
 _viA(struct uaio_task *self, struct term *term) {
     char c;
+    struct cmd *cmdline = TERM_CMDLINE(term);
     UAIO_BEGIN(self);
 
 aread:
@@ -354,12 +355,15 @@ aread:
 
     TERM_INBUFF_SKIP(term, 1);
 
-    if (ASCII_ISDIGIT(c)) {
-        if (term->vi_repeat > 0) {
-            term->vi_repeat *= 10;
+    if (term->vi_repeat == -1) {
+        if (ASCII_IS1TO9(c)) {
+            term->vi_repeat = c - '0';
+            goto aread;
         }
+    }
+    else if (ASCII_ISDIGIT(c)) {
+        term->vi_repeat *= 10;
         term->vi_repeat += c - '0';
-        DEBUG("VI: repeat: %d", term->vi_repeat);
         goto aread;
     }
 
@@ -367,7 +371,25 @@ aread:
         term->vi_repeat = 1;
     }
 
-    DEBUG("VI: repeat: %d", term->vi_repeat);
+    // DEBUG("VI: repeat: %d", term->vi_repeat);
+
+    if (c == 'd') {
+        if (TERM_INBUFF_COUNT(term) < 1) {
+            EUART_AREAD(self, &term->reader, 1);
+        }
+        c = TERM_INBUFF_GET(term);
+        if (c == '$') {
+            _delete(term, cmdline->len);
+        }
+        else if (c == '0') {
+            _delete(term, -cmdline->len);
+        }
+        else if (c == 'd') {
+            _cursor_move(term, -term->col);
+            _delete(term, cmdline->len);
+        }
+        UAIO_RETURN(self);
+    }
 
     switch (c) {
         case 'i':
@@ -399,12 +421,17 @@ aread:
             break;
 
         case '$':
-            _cursor_move(term, TERM_CMDLINE(term)->len);
+            _cursor_move(term, cmdline->len);
             break;
 
         case 'a':
             _vi_switch(term, VI_INSERT);
             _cursor_move(term, 1);
+            break;
+
+        case 'A':
+            _vi_switch(term, VI_INSERT);
+            _cursor_move(term, cmdline->len);
             break;
 
         case 'x':
@@ -416,8 +443,8 @@ aread:
             break;
     }
 
-    term->vi_repeat = -1;
     UAIO_FINALLY(self);
+    term->vi_repeat = -1;
 }
 
 
@@ -508,7 +535,7 @@ prompt:
             //DEBUG("c: %d", c);
 
             /* vi */
-            if (term->mode == VI_NORMAL) {
+            if (term->vi_mode == VI_NORMAL) {
                 /* normal mode */
                 TERM_AWAIT(self, _viA, term);
                 continue;
