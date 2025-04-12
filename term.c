@@ -20,6 +20,123 @@
 #include "uaio_generic.c"
 
 
+/** Puts the current command line (cmdring's head) into the history and
+ * initialize the new head as the command line
+ */
+static int
+_history_put(struct term *term) {
+    struct cmd *first = NULL;
+    struct cmd *cmdline = TERM_CMDLINE(term);
+
+    if (cmd_isempty(cmdline)) {
+        goto done;
+    }
+
+    /* prevent duplicate entries in order */
+    if (TERM_HISTORY_COUNT(term)) {
+        first = TERM_HISTORY_OFFSET(term, 1);
+        if (cmd_isempty(first) || (cmd_compare(first, cmdline) == 0)) {
+            goto done;
+        }
+    }
+
+    /* reuse the last item if possible */
+    if (TERM_HISTORY_ISFULL(term)) {
+        TERM_HISTORY_SHRINK(term);
+        TERM_HISTORY_EXTEND(term);
+        goto done;
+    }
+
+    /* initialize and allocate the first item of the history (aka cmdline) */
+    TERM_HISTORY_EXTEND(term);
+    if (cmd_init(TERM_HISTORY_OFFSET(term, 0), CONFIG_USH_TERM_LINESIZE)) {
+        TERM_HISTORY_EXTEND(term);
+        return -1;
+    }
+
+done:
+    TERM_HISTORY_OFFSET(term, 0)->len = 0;
+    term->col = 0;
+    return 0;
+}
+
+
+static int
+_prompt(struct term *term) {
+    if (term_printf(term, "%s%s%s:# ", LINEBREAK, ANSI_RESET,
+                CONFIG_USH_PROMPT) == -1) {
+        return -1;
+    }
+
+    term->rotation = 0;
+    return 0;
+}
+
+
+/** Initialize and allocate resources for the terminal
+ */
+int
+term_init(struct term *term, int infd, int outfd) {
+    if ((term == NULL) || (infd < 0) || (outfd < 0)) {
+        return -1;
+    }
+
+    /* zero set */
+    memset(term, 0, sizeof(struct term));
+
+    /* initialize uart reader */
+    if (euart_reader_init(&term->reader, infd,
+                CONFIG_USH_TERM_READER_RINGMASK_BITS)) {
+        return -1;
+    }
+
+    /* initialize commands circular buffer */
+    if (cmdring_init(&term->history,
+                CONFIG_USH_TERM_HISTORY_RINGMASK_BITS)) {
+        goto rollback;
+    }
+
+    /* initialize and allocate the first item of the history */
+    if (cmd_init(TERM_HISTORY_OFFSET(term, 0), CONFIG_USH_TERM_LINESIZE)) {
+        goto rollback;
+    }
+
+#ifdef CONFIG_USH_VI
+    vi_init(&term->vi, term);
+#endif  // CONFIG_USH_VI
+
+    term->outfd = outfd;
+    term->rotation = 0;
+    term->col = 0;
+    return 0;
+
+rollback:
+    cmdring_deinit(&term->history);
+    euart_reader_deinit(&term->reader);
+    return -1;
+}
+
+
+/** Deinitialize and release all resource allocated for the terminal
+ */
+int
+term_deinit(struct term *term) {
+    int ret = 0;
+    struct cmdring *history = &term->history;
+
+    /* flush the cmdring */
+    cmd_deinit(ERING_HEADPTR(history));
+    while (TERM_HISTORY_COUNT(term)) {
+        cmd_deinit(ERING_TAILPTR(history));
+        ERING_INCRTAIL(history);
+    }
+
+    ret |= cmdring_deinit(history);
+    ret |= euart_reader_deinit(&term->reader);
+    return ret;
+}
+
+
 int
 term_printf(struct term *term, const char *restrict fmt, ...) {
     int ret;
@@ -203,193 +320,6 @@ term_history_rotate(struct term *term, int steps) {
 }
 
 
-/** Puts the current command line (cmdring's head) into the history and
- * initialize the new head as the command line
- */
-static int
-_history_put(struct term *term) {
-    struct cmd *first = NULL;
-    struct cmd *cmdline = TERM_CMDLINE(term);
-
-    if (cmd_isempty(cmdline)) {
-        goto done;
-    }
-
-    /* prevent duplicate entries in order */
-    if (TERM_HISTORY_COUNT(term)) {
-        first = TERM_HISTORY_OFFSET(term, 1);
-        if (cmd_isempty(first) || (cmd_compare(first, cmdline) == 0)) {
-            goto done;
-        }
-    }
-
-    /* reuse the last item if possible */
-    if (TERM_HISTORY_ISFULL(term)) {
-        TERM_HISTORY_SHRINK(term);
-        TERM_HISTORY_EXTEND(term);
-        goto done;
-    }
-
-    /* initialize and allocate the first item of the history (aka cmdline) */
-    TERM_HISTORY_EXTEND(term);
-    if (cmd_init(TERM_HISTORY_OFFSET(term, 0), CONFIG_USH_TERM_LINESIZE)) {
-        TERM_HISTORY_EXTEND(term);
-        return -1;
-    }
-
-done:
-    TERM_HISTORY_OFFSET(term, 0)->len = 0;
-    term->col = 0;
-    return 0;
-}
-
-
-static int
-_prompt(struct term *term) {
-    if (term_printf(term, "%s%s%s:# ", LINEBREAK, ANSI_RESET,
-                CONFIG_USH_PROMPT) == -1) {
-        return -1;
-    }
-
-    term->rotation = 0;
-    return 0;
-}
-
-
-/** Initialize and allocate resources for the terminal
- */
-int
-term_init(struct term *term, int infd, int outfd) {
-    if ((term == NULL) || (infd < 0) || (outfd < 0)) {
-        return -1;
-    }
-
-    /* zero set */
-    memset(term, 0, sizeof(struct term));
-
-    /* initialize uart reader */
-    if (euart_reader_init(&term->reader, infd,
-                CONFIG_USH_TERM_READER_RINGMASK_BITS)) {
-        return -1;
-    }
-
-    /* initialize commands circular buffer */
-    if (cmdring_init(&term->history,
-                CONFIG_USH_TERM_HISTORY_RINGMASK_BITS)) {
-        goto rollback;
-    }
-
-    /* initialize and allocate the first item of the history */
-    if (cmd_init(TERM_HISTORY_OFFSET(term, 0), CONFIG_USH_TERM_LINESIZE)) {
-        goto rollback;
-    }
-
-#ifdef CONFIG_USH_VI
-    vi_init(&term->vi, term);
-#endif  // CONFIG_USH_VI
-
-    term->outfd = outfd;
-    term->rotation = 0;
-    term->col = 0;
-    return 0;
-
-rollback:
-    cmdring_deinit(&term->history);
-    euart_reader_deinit(&term->reader);
-    return -1;
-}
-
-
-/** Deinitialize and release all resource allocated for the terminal
- */
-int
-term_deinit(struct term *term) {
-    int ret = 0;
-    struct cmdring *history = &term->history;
-
-    /* flush the cmdring */
-    cmd_deinit(ERING_HEADPTR(history));
-    while (TERM_HISTORY_COUNT(term)) {
-        cmd_deinit(ERING_TAILPTR(history));
-        ERING_INCRTAIL(history);
-    }
-
-    ret |= cmdring_deinit(history);
-    ret |= euart_reader_deinit(&term->reader);
-    return ret;
-}
-
-
-static ASYNC
-_escape(struct uaio_task *self, struct term *term) {
-    int skip = 0;
-    char c = 0;
-    UAIO_BEGIN(self);
-
-    EUART_AREADT(self, &term->reader, 4, CONFIG_USH_TERM_READER_TIMEOUT_US);
-    if (TERM_INBUFF_COUNT(term) < 3) {
-        goto insufficient;
-    }
-
-    /* ansi control: [ */
-    c = TERM_INBUFF_GETOFF(term, 1);
-    if (c != '[') {
-        goto notsupported;
-    }
-
-    /* skip ESC and [ */
-    skip = 2;
-
-    /* ansi command */
-    c = TERM_INBUFF_GETOFF(term, 2);
-
-    /* delete ^[3~ */
-    if (c == '3') {
-        if ((TERM_INBUFF_COUNT(term) <= 3) ||
-                TERM_INBUFF_GETOFF(term, 3) != '~') {
-            goto notsupported;
-        }
-
-        term_delete(term, 1);
-        skip += 2;
-        goto eat;
-    }
-
-    switch (c) {
-        case 'A':
-            term_history_rotate(term, 1);
-            skip++;
-            break;
-        case 'B':
-            term_history_rotate(term, -1);
-            skip++;
-            break;
-        case 'C':
-            term_cursor_move(term, 1);
-            skip++;
-            break;
-        case 'D':
-            term_cursor_move(term, -1);
-            skip++;
-            break;
-        default:
-            goto notsupported;
-    }
-
-    goto eat;
-
-
-insufficient:
-notsupported:
-    UAIO_THROW2(self, EINVAL);
-
-eat:
-    TERM_INBUFF_SKIP(term, skip);
-    UAIO_CLEARERROR(self);
-    UAIO_FINALLY(self);
-}
-
-
 ASYNC
 term_readA(struct uaio_task *self, struct term *term) {
     char c;
@@ -418,10 +348,10 @@ prompt:
             /* escape pressed */
             if (c == ASCII_ESC) {
                 /* try ansi escape */
-                TERM_AWAIT(self, _escape, term);
+                TERM_AWAIT(self, ansiA, term);
 #ifdef CONFIG_USH_VI
                 if (UAIO_HASERROR(self)) {
-                    /* ESC is not eaten by _escape, switch to normal mode */
+                    /* ESC is not eaten by ansiA, switch to normal mode */
                     vi_swmode(&term->vi, VI_NORMAL);
                     TERM_INBUFF_SKIP(term, 1);
                 }

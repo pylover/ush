@@ -1,5 +1,6 @@
 set(sources
   "cmd.c"
+  "ansi.c"
   "term.c"
   "ush.c"
 )

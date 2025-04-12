@@ -146,9 +146,9 @@ aread:
             WARN("vi command: %c is not supported", c);
             break;
     }
+    vi->repeat = -1;
 
     UAIO_FINALLY(self);
-    vi->repeat = -1;
 }
 
 

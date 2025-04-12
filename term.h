@@ -5,7 +5,6 @@
 #include <uaio.h>
 #include <euart.h>
 
-#include "ansi.h"
 #include "cmd.h"
 
 
@@ -61,20 +60,36 @@ int
 term_deinit(struct term *term);
 
 
-ASYNC
-term_readA(struct uaio_task *self, struct term *term);
+int
+term_printf(struct term *term, const char *restrict fmt, ...);
 
 
 void
 term_cursor_move(struct term *term, int cols);
 
 
+int
+term_insert(struct term *term, char c);
+
+
+void
+term_rewrite(struct term *term, int index);
+
+
 void
 term_delete(struct term *term, unsigned int count);
 
 
+void
+term_backspace(struct term *term, int count);
+
+
 int
 term_history_rotate(struct term *term, int steps);
+
+
+ASYNC
+term_readA(struct uaio_task *self, struct term *term);
 
 
 #endif
