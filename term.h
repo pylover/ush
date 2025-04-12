@@ -2,21 +2,21 @@
 #define TERM_H_
 
 
+#include <uaio.h>
 #include <euart.h>
 
 #include "ansi.h"
 #include "cmd.h"
 
 
+#ifdef CONFIG_USH_VI
+#include "vi.h"
+#endif  // CONFIG_USH_VI
+
+
 #undef ERING_PREFIX
 #define ERING_PREFIX cmd
 #include <ering.h>
-
-
-enum vi_mode {
-    VI_NORMAL,
-    VI_INSERT,
-};
 
 
 typedef struct term {
@@ -26,8 +26,7 @@ typedef struct term {
     unsigned int rotation;
     unsigned int col;
 #ifdef CONFIG_USH_VI
-    enum vi_mode vi_mode;
-    int vi_repeat;
+    struct vi vi;
 #endif  // CONFIG_USH_VI
 } term_t;
 
@@ -64,6 +63,18 @@ term_deinit(struct term *term);
 
 ASYNC
 term_readA(struct uaio_task *self, struct term *term);
+
+
+void
+term_cursor_move(struct term *term, int cols);
+
+
+void
+term_delete(struct term *term, unsigned int count);
+
+
+int
+term_history_rotate(struct term *term, int steps);
 
 
 #endif

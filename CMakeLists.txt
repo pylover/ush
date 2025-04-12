@@ -5,6 +5,13 @@ set(sources
 )
 
 
+if (CONFIG_USH_VI)
+  list(APPEND sources
+    "vi.c"
+  )
+endif()
+
+
 idf_component_register(
   SRCS "${sources}"
   INCLUDE_DIRS "include"
