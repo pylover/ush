@@ -142,6 +142,10 @@ aread:
             term_delete(term, vi->repeat);
             break;
 
+        case 'w':
+            term_cursor_nextwords(term, vi->repeat);
+            break;
+
         default:
             WARN("vi command: %c is not supported", c);
             break;

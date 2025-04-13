@@ -178,6 +178,74 @@ term_cursor_move(struct term *term, int cols) {
 }
 
 
+void
+term_cursor_nextwords(struct term *term, int words) {
+    /*
+     * status char  action
+     * w      w     ++ continue
+     * w      b     found
+     * w      s     found
+     * s      w     found
+     * s      b     found
+     * s      s     found
+     *
+     *
+     * found:
+     * 1. skip blank chars
+     * 2. move cursor
+     */
+    struct cmd *cmd = TERM_CMDLINE(term);
+    char status;
+    char c;
+    int i = term->col;
+
+    if (!cmd->len) {
+        return;
+    }
+
+    status =  ASCII_ISALPHA(cmd_getc(cmd, i))? 'w': 's';
+    if (status == 's') {
+        i++;
+    }
+
+    while (words && (i < cmd->len)) {
+        c = cmd_getc(cmd, i);
+        DEBUG("(%c) c: %c, i: %d", status, c, i);
+        if (ASCII_ISALPHA(c)) {
+            if (status == 'w') {
+                i++;
+                continue;
+            }
+            status = 'w';
+        }
+        else if (status == 'w') {
+            status = 's';
+        }
+
+        /* skip blank chars */
+        if (ASCII_ISBLANK(c)) {
+            for (++i; i < cmd->len; i++) {
+                if (!ASCII_ISBLANK(cmd_getc(cmd, i))) {
+                    break;
+                }
+            }
+
+            if (i >= cmd->len) {
+                break;
+            }
+        }
+
+        term_cursor_move(term, i - term->col);
+        words--;
+        i++;
+    }
+
+    if (!(cmd->len - i) && words) {
+        term_cursor_move(term, cmd->len - 1);
+    }
+}
+
+
 int
 term_insert(struct term *term, char c) {
     // 01234567

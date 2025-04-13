@@ -17,10 +17,13 @@
  * delete: 27[126
  */
 #define ASCII_ISBACKSPACE(c) ((c == 8) || (c == 127))
-
-
 #define ASCII_ISDIGIT(c) ((c >= 48) && (c <= 57))
 #define ASCII_IS1TO9(c) ((c >= 49) && (c <= 57))
+#define ASCII_ISALPHA(c) ( \
+        ((c >= 65) && (c <= 90)) || \
+        ((c >= 97) && (c <= 122)))
+#define ASCII_ISBLANK(c) ((c == 9) || (c <= 32))
+#define ASCII_ISWORDSEP(c) (!(ASCII_ISDIGIT(c) || ASCII_ISALPHA(c)))
 
 
 /** ASCII control characters (character code 0-31)

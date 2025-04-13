@@ -24,6 +24,7 @@ typedef struct cmd {
     strncmp((c1)->buff, (c2)->buff, MAX((c1)->len, (c2)->len))
 #define cmd_ptr(c) (c)->buff
 #define cmd_ptroff(c, off) ((c)->buff + (off))
+#define cmd_getc(c, idx) ((c)->buff[idx])
 
 
 int
