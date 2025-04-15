@@ -205,16 +205,11 @@ term_cursor_nextwords(struct term *term, int words) {
     while (words && (++i < cmd->len)) {
         prev = cur;
         cur = cmd_getc(cmd, i);
-        if (ASCII_ISALPHA(prev) && ASCII_ISALPHA(cur)) {
-            continue;
+        if (!ASCII_ISBLANK(cur) &&
+                (!ASCII_ISALPHANUM(cur) || !ASCII_ISALPHANUM(prev))) {
+            term_cursor_move(term, i - term->col);
+            words--;
         }
-
-        if (ASCII_ISBLANK(cur)) {
-            continue;
-        }
-
-        term_cursor_move(term, i - term->col);
-        words--;
     }
 
     if (!(cmd->len - i) && words) {
