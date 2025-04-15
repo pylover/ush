@@ -24,6 +24,27 @@
         ((c >= 97) && (c <= 122)))
 #define ASCII_ISBLANK(c) ((c == 9) || (c <= 32))
 #define ASCII_ISWORDSEP(c) (!(ASCII_ISDIGIT(c) || ASCII_ISALPHA(c)))
+#define ASCII_ISALPHANUM(c) (ASCII_ISALPHA(c) || ASCII_ISDIGIT(c))
+
+
+enum ckind {
+    CK_W = 1,
+    CK_S = 2,
+    CK_B = 4,
+    CK_N = 8,
+    CK_ANY = 15
+};
+
+
+extern char ckinds[];
+
+
+enum ckind
+ckind(char c);
+
+
+int
+kindmatch(int s[3], enum ckind prev, enum ckind cur, enum ckind next);
 
 
 /** ASCII control characters (character code 0-31)

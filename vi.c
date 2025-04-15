@@ -146,6 +146,10 @@ aread:
             term_cursor_nextwords(term, vi->repeat);
             break;
 
+        case 'b':
+            term_cursor_prevwords(term, vi->repeat);
+            break;
+
         default:
             WARN("vi command: %c is not supported", c);
             break;

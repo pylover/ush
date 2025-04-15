@@ -181,6 +181,12 @@ term_cursor_move(struct term *term, int cols) {
 void
 term_cursor_nextwords(struct term *term, int words) {
     /*
+     * prev cur  next   action
+     * *    w    w      i--; continue
+     * *    b    *      i--; continue
+     * w    w    sbn    found cur; i--; continue
+     * *    s    wsbn   found cur; i--; continue
+     *
      * status char  action
      * w      w     ++ continue
      * w      b     found
@@ -203,14 +209,10 @@ term_cursor_nextwords(struct term *term, int words) {
         return;
     }
 
-    status =  ASCII_ISALPHA(cmd_getc(cmd, i))? 'w': 's';
-    if (status == 's') {
-        i++;
-    }
-
+    c = cmd_getc(cmd, i++);
+    status = ASCII_ISALPHA(c)? 'w': 's';
     while (words && (i < cmd->len)) {
         c = cmd_getc(cmd, i);
-        DEBUG("(%c) c: %c, i: %d", status, c, i);
         if (ASCII_ISALPHA(c)) {
             if (status == 'w') {
                 i++;
@@ -242,6 +244,41 @@ term_cursor_nextwords(struct term *term, int words) {
 
     if (!(cmd->len - i) && words) {
         term_cursor_move(term, cmd->len - 1);
+    }
+}
+
+
+void
+term_cursor_prevwords(struct term *term, int words) {
+    /*
+     * prev cur  next   action
+     * *    w    w      i--; continue
+     * *    b    *      i--; continue
+     * w    w    sbn    found cur; i--; continue
+     * *    s    wsbn   found cur; i--; continue
+     *
+     * found:
+     * 1. skip blank chars
+     * 2. move cursor
+     */
+    struct cmd *cmd = TERM_CMDLINE(term);
+    int i = term->col;
+    char cur = 0;
+    char next = 0;
+
+    if ((i <= 0) || (cmd->len <= 0)) {
+        return;
+    }
+
+    while (words && (--i >= 0)) {
+        cur = cmd_getc(cmd, i);
+        next = i > 0? cmd_getc(cmd, i - 1): 0;
+        if (!ASCII_ISBLANK(cur) &&
+                (!ASCII_ISALPHANUM(cur) || !ASCII_ISALPHANUM(next)) &&
+                (i != term->col)) {
+            term_cursor_move(term, i - term->col);
+            words--;
+        }
     }
 }
 
