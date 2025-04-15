@@ -181,65 +181,40 @@ term_cursor_move(struct term *term, int cols) {
 void
 term_cursor_nextwords(struct term *term, int words) {
     /*
-     * prev cur  next   action
-     * *    w    w      i--; continue
-     * *    b    *      i--; continue
-     * w    w    sbn    found cur; i--; continue
-     * *    s    wsbn   found cur; i--; continue
+     * b: blank
+     * w: alphanum
+     * s: everything else
      *
-     * status char  action
-     * w      w     ++ continue
-     * w      b     found
-     * w      s     found
-     * s      w     found
-     * s      b     found
-     * s      s     found
+     * prev cur  action
+     * w    w    i++; continue
+     * *    b    i++; continue
+     * w    s    found
+     * *    *    found
      *
-     *
-     * found:
-     * 1. skip blank chars
-     * 2. move cursor
      */
     struct cmd *cmd = TERM_CMDLINE(term);
-    char status;
-    char c;
     int i = term->col;
+    char cur = 0;
+    char prev = 0;
 
     if (!cmd->len) {
         return;
     }
 
-    c = cmd_getc(cmd, i++);
-    status = ASCII_ISALPHA(c)? 'w': 's';
-    while (words && (i < cmd->len)) {
-        c = cmd_getc(cmd, i);
-        if (ASCII_ISALPHA(c)) {
-            if (status == 'w') {
-                i++;
-                continue;
-            }
-            status = 'w';
-        }
-        else if (status == 'w') {
-            status = 's';
+    cur = cmd_getc(cmd, i);
+    while (words && (++i < cmd->len)) {
+        prev = cur;
+        cur = cmd_getc(cmd, i);
+        if (ASCII_ISALPHA(prev) && ASCII_ISALPHA(cur)) {
+            continue;
         }
 
-        /* skip blank chars */
-        if (ASCII_ISBLANK(c)) {
-            for (++i; i < cmd->len; i++) {
-                if (!ASCII_ISBLANK(cmd_getc(cmd, i))) {
-                    break;
-                }
-            }
-
-            if (i >= cmd->len) {
-                break;
-            }
+        if (ASCII_ISBLANK(cur)) {
+            continue;
         }
 
         term_cursor_move(term, i - term->col);
         words--;
-        i++;
     }
 
     if (!(cmd->len - i) && words) {
@@ -251,15 +226,16 @@ term_cursor_nextwords(struct term *term, int words) {
 void
 term_cursor_prevwords(struct term *term, int words) {
     /*
-     * prev cur  next   action
-     * *    w    w      i--; continue
-     * *    b    *      i--; continue
-     * w    w    sbn    found cur; i--; continue
-     * *    s    wsbn   found cur; i--; continue
+     * b: blank
+     * w: alphanum
+     * s: everything else
      *
-     * found:
-     * 1. skip blank chars
-     * 2. move cursor
+     * cur  next   action
+     * w    w      i--; continue
+     * b    *      i--; continue
+     * w    sbn    found cur; i--; continue
+     * s    wsbn   found cur; i--; continue
+     *
      */
     struct cmd *cmd = TERM_CMDLINE(term);
     int i = term->col;
