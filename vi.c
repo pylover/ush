@@ -12,6 +12,111 @@
 #include "uaio_generic.c"
 
 
+static void
+_nextwords(struct vi *vi, int words) {
+    /*
+     * b: blank
+     * w: alphanum
+     * s: everything else
+     *
+     * prev cur  action
+     * w    w    i++; continue
+     * *    b    i++; continue
+     * *    *    found
+     *
+     */
+    struct term *term = vi->term;
+    struct cmd *cmd = TERM_CMDLINE(term);
+    int i = term->col;
+    char cur = 0;
+    char prev = 0;
+
+    cur = cmd_getc(cmd, i);
+    while (words && (++i < cmd->len)) {
+        prev = cur;
+        cur = cmd_getc(cmd, i);
+        if (!ASCII_ISBLANK(cur) &&
+                (!ASCII_ISALPHANUM(cur) || !ASCII_ISALPHANUM(prev)) &&
+                (i != term->col)) {
+            term_cursor_move(term, i - term->col);
+            words--;
+        }
+    }
+
+    if (!(cmd->len - i) && words) {
+        term_cursor_move(term, cmd->len - 1);
+    }
+}
+
+
+static void
+_nextendofwords(struct vi *vi, int words) {
+    /*
+     * b: blank
+     * w: alphanum
+     * s: everything else
+     *
+     * cur  next   action
+     * w    w      i--; continue
+     * b    *      i--; continue
+     * *    *      found cur; i--; continue
+     *
+     */
+    struct term *term = vi->term;
+    struct cmd *cmd = TERM_CMDLINE(term);
+    int i = term->col;
+    char cur = 0;
+    char next = 0;
+
+    while (words && (++i < cmd->len)) {
+        cur = cmd_getc(cmd, i);
+        next = i > 0? cmd_getc(cmd, i + 1): 0;
+        if (!ASCII_ISBLANK(cur) &&
+                (!ASCII_ISALPHANUM(cur) || !ASCII_ISALPHANUM(next)) &&
+                (i != term->col)) {
+            term_cursor_move(term, i - term->col);
+            words--;
+        }
+    }
+}
+
+
+static void
+_prevwords(struct vi *vi, int words) {
+    /*
+     * b: blank
+     * w: alphanum
+     * s: everything else
+     *
+     * cur  next   action
+     * w    w      i--; continue
+     * b    *      i--; continue
+     * *    *      found cur; i--; continue
+     *
+     */
+    struct term *term = vi->term;
+    struct cmd *cmd = TERM_CMDLINE(term);
+    int i = term->col;
+    char cur = 0;
+    char next = 0;
+
+    if ((i <= 0) || (cmd->len <= 0)) {
+        return;
+    }
+
+    while (words && (--i >= 0)) {
+        cur = cmd_getc(cmd, i);
+        next = i > 0? cmd_getc(cmd, i - 1): 0;
+        if (!ASCII_ISBLANK(cur) &&
+                (!ASCII_ISALPHANUM(cur) || !ASCII_ISALPHANUM(next)) &&
+                (i != term->col)) {
+            term_cursor_move(term, i - term->col);
+            words--;
+        }
+    }
+}
+
+
 void
 vi_init(struct vi *vi, struct term *term) {
     vi->term = term;
@@ -59,7 +164,7 @@ aread:
 
     TERM_INBUFF_SKIP(term, 1);
 
-    DEBUG("VI: repeat: %d, c: %c", vi->repeat, c);
+    // DEBUG("VI: repeat: %d, c: %c", vi->repeat, c);
     if (vi->repeat == -1) {
         if (ASCII_IS1TO9(c)) {
             vi->repeat = c - '0';
@@ -75,7 +180,7 @@ aread:
     if (vi->repeat <= 0) {
         vi->repeat = 1;
     }
-    DEBUG("VI: repeat: %d", vi->repeat);
+    // DEBUG("VI: repeat: %d", vi->repeat);
 
     if (c == 'd') {
         if (TERM_INBUFF_COUNT(term) < 1) {
@@ -143,11 +248,15 @@ aread:
             break;
 
         case 'w':
-            term_cursor_nextwords(term, vi->repeat);
+            _nextwords(vi, vi->repeat);
             break;
 
         case 'b':
-            term_cursor_prevwords(term, vi->repeat);
+            _prevwords(vi, vi->repeat);
+            break;
+
+        case 'e':
+            _nextendofwords(vi, vi->repeat);
             break;
 
         default:
@@ -158,5 +267,3 @@ aread:
 
     UAIO_FINALLY(self);
 }
-
-

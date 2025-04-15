@@ -68,14 +68,6 @@ void
 term_cursor_move(struct term *term, int cols);
 
 
-void
-term_cursor_nextwords(struct term *term, int words);
-
-
-void
-term_cursor_prevwords(struct term *term, int words);
-
-
 int
 term_insert(struct term *term, char c);
 
