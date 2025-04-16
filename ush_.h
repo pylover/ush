@@ -19,4 +19,8 @@ typedef struct ush {
 } ush_t;
 
 
+struct ush_executable*
+ush_exec_find(struct ush *sh, const char *name);
+
+
 #endif  // USH__H_

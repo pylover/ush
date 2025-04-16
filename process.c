@@ -17,12 +17,6 @@
 #include <uaio_generic.c>
 
 
-static struct ush_executable*
-_findexec(struct ush *sh, const char *name) {
-    return NULL;
-}
-
-
 static int
 _tokenize(struct ush_process *p) {
     char *s;
@@ -37,7 +31,7 @@ _tokenize(struct ush_process *p) {
             break;
         }
         errno = 0;
-        argv = realloc(argv, argc + 1);
+        argv = realloc(argv, (argc + 1) * sizeof(char*));
         if (errno == ENOMEM) {
             if (argv) {
                 free(argv);
@@ -80,7 +74,13 @@ process_create(struct ush *sh, struct cmd *cmd) {
     }
 
     /* find entrypoint */
-    exe = _findexec(sh, p->argv[0]);
+    if (p->argv == NULL) {
+        free(b);
+        free(p);
+        return NULL;
+    }
+
+    exe = ush_exec_find(sh, p->argv[0]);
     if (exe == NULL) {
         term_printf(&sh->term, "Command '%s' not found%s", p->argv[0],
                 LINEBREAK);

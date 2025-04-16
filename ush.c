@@ -62,6 +62,12 @@ ush_destroy(struct ush *sh) {
 }
 
 
+struct ush_executable*
+ush_exec_find(struct ush *sh, const char *name) {
+    return NULL;
+}
+
+
 ASYNC
 ushA(struct uaio_task *self, struct ush *sh) {
     struct term *term = &sh->term;
