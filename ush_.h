@@ -1,5 +1,5 @@
-#ifndef STATE_H_
-#define STATE_H_
+#ifndef USH__H_
+#define USH__H_
 
 
 #include "cmd.h"
@@ -9,11 +9,11 @@
 
 typedef struct ush {
     struct term term;
-    struct cmd executing;
+    struct ush_process executing;
 
     /* user provided commands vector */
     struct ush_executable *commands;
 } ush_t;
 
 
-#endif
+#endif  // USH__H_

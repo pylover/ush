@@ -11,13 +11,13 @@ typedef struct ush ush_t;
 #undef UAIO_ARG2
 #undef UAIO_ENTITY
 #define UAIO_ENTITY ush
-#include "uaio_generic.h"
+#include <uaio_generic.h>
 
 
 typedef struct ush_process {
+    char *buff;
     int argc;
     char **argv;
-    void *userptr;
 } ush_process_t;
 
 
@@ -25,7 +25,7 @@ typedef struct ush_process {
 #undef UAIO_ARG2
 #undef UAIO_ENTITY
 #define UAIO_ENTITY ush_process
-#include "uaio_generic.h"
+#include <uaio_generic.h>
 
 
 struct ush_executable {

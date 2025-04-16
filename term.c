@@ -216,8 +216,6 @@ term_rewrite(struct term *term, int index) {
         term_cursor_move(term, index - term->col);
     }
 
-    DEBUG("index; %d, cmdlen: %d, %.*s", index, cmd->len,
-            cmd->len, cmd_ptr(cmd));
     term_printf(term, "%s%.*s", ANSI_ERASETOEND, (cmd->len - index),
             cmd_ptroff(cmd, index));
     term->col = cmd->len;
@@ -249,7 +247,6 @@ term_delete(struct term *term, unsigned int count) {
     }
 
     /* 2 */
-    DEBUG("dirty: %d", dirty);
     term_rewrite(term, dirty);
 
     /* 3 */

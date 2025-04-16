@@ -2,6 +2,7 @@ set(sources
   "cmd.c"
   "ansi.c"
   "term.c"
+  "process.c"
   "ush.c"
 )
 

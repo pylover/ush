@@ -5,7 +5,8 @@
 
 #include "config.h"
 #include "ush.h"
-#include "state.h"
+#include "process.h"
+#include "ush_.h"
 #include "term.h"
 
 
@@ -33,16 +34,14 @@ ush_create(struct euart_device *console, struct ush_executable commands[]) {
         goto failed;
     }
 
-    if (cmd_init(&sh->executing, CONFIG_USH_TERM_LINESIZE)) {
-        goto failed;
-    }
-
     sh->commands = commands;
+    sh->executing.buff = NULL;
+    sh->executing.argv = NULL;
+    sh->executing.argc = 0;
     return sh;
 
 failed:
     term_deinit(&sh->term);
-    cmd_deinit(&sh->executing);
     free(sh);
     return NULL;
 }
@@ -56,7 +55,7 @@ ush_destroy(struct ush *sh) {
         return -1;
     }
 
-    cmd_deinit(&sh->executing);
+    process_free(&sh->executing);
     ret |= term_deinit(&sh->term);
 
     free(sh);
@@ -67,19 +66,25 @@ ush_destroy(struct ush *sh) {
 ASYNC
 ushA(struct uaio_task *self, struct ush *sh) {
     struct term *term = &sh->term;
-    struct cmd *cmd = &sh->executing;
+    struct ush_process *p = &sh->executing;
     UAIO_BEGIN(self);
 
     /* loop */
     while (true) {
-        cmd_clear(cmd);
+        process_free(p);
         TERM_AREADLINE(self, term);
         if (UAIO_HASERROR(self)) {
             ERROR("term read error");
             continue;
         }
-        cmd_copy(cmd, TERM_CMDLINE(term));
-        DEBUG("command: %.*s", cmd->len, cmd->buff);
+        if (process_fromcmd(p, TERM_CMDLINE(term))) {
+            ERROR("process create");
+            continue;
+        }
+        DEBUG("new process: %s", p->buff);
+        for (int i = 0; i < p->argc; i++) {
+            DEBUG("[%d] %s", i, p->argv[i]);
+        }
     }
 
     /* termination */
