@@ -14,18 +14,20 @@ typedef struct ush ush_t;
 #include <uaio_generic.h>
 
 
-typedef struct ush_process {
-    char *buff;
-    int argc;
-    char **argv;
-} ush_process_t;
-
-
+typedef struct ush_process ush_process_t;
 #undef UAIO_ARG1
 #undef UAIO_ARG2
 #undef UAIO_ENTITY
 #define UAIO_ENTITY ush_process
 #include <uaio_generic.h>
+
+
+struct ush_process {
+    char *buff;
+    int argc;
+    char **argv;
+    ush_process_coro_t entrypoint;
+};
 
 
 struct ush_executable {

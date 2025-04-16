@@ -63,8 +63,7 @@ done:
 
 static int
 _prompt(struct term *term) {
-    if (term_printf(term, "%s%s%s:# ", LINEBREAK, ANSI_RESET,
-                CONFIG_USH_PROMPT) == -1) {
+    if (term_printf(term, "%s%s:# ", ANSI_RESET, CONFIG_USH_PROMPT) == -1) {
         return -1;
     }
 
@@ -369,6 +368,7 @@ prompt:
             /* enter */
             if (c == ASCII_LF) {
                 cmd = TERM_CMDLINE(term);
+                term_printf(term, LINEBREAK);
                 if (cmd->len == 0) {
                     goto prompt;
                 }

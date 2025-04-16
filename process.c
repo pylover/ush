@@ -3,6 +3,9 @@
 #include <uaio.h>
 
 #include "ush.h"
+#include "config.h"
+#include "ush_.h"
+#include "term.h"
 #include "cmd.h"
 #include "process.h"
 
@@ -12,6 +15,12 @@
 #undef UAIO_ENTITY
 #define UAIO_ENTITY ush_process
 #include <uaio_generic.c>
+
+
+static struct ush_executable*
+_findexec(struct ush *sh, const char *name) {
+    return NULL;
+}
 
 
 static int
@@ -44,17 +53,21 @@ _tokenize(struct ush_process *p) {
 }
 
 
-int
-process_fromcmd(struct ush_process *p, struct cmd *cmd) {
+struct ush_process *
+process_create(struct ush *sh, struct cmd *cmd) {
     char *b;
+    struct ush_process *p;
+    struct ush_executable *exe;
 
-    if (p->buff) {
-        return -1;
+    p = malloc(sizeof(struct ush_process));
+    if (p == NULL) {
+        return NULL;
     }
 
     b = malloc(cmd->len + 1);
     if (b == NULL) {
-        return -1;
+        free(p);
+        return NULL;
     }
     memcpy(b, cmd->buff, cmd->len);
     b[cmd->len] = 0;
@@ -62,11 +75,22 @@ process_fromcmd(struct ush_process *p, struct cmd *cmd) {
 
     if (_tokenize(p)) {
         free(b);
-        p->buff = NULL;
-        return -1;
+        free(p);
+        return NULL;
     }
 
-    return 0;
+    /* find entrypoint */
+    exe = _findexec(sh, p->argv[0]);
+    if (exe == NULL) {
+        term_printf(&sh->term, "Command '%s' not found%s", p->argv[0],
+                LINEBREAK);
+        free(p->argv);
+        free(b);
+        free(p);
+        return NULL;
+    }
+
+    return p;
 }
 
 
@@ -82,4 +106,6 @@ process_free(struct ush_process *p) {
         p->argv = NULL;
         p->argc = 0;
     }
+
+    free(p);
 }

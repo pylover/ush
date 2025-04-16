@@ -5,8 +5,8 @@
 #include "cmd.h"
 
 
-int
-process_fromcmd(struct ush_process *p, struct cmd *cmd);
+struct ush_process *
+process_create(struct ush *sh, struct cmd *cmd);
 
 
 void

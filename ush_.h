@@ -9,7 +9,10 @@
 
 typedef struct ush {
     struct term term;
-    struct ush_process executing;
+    struct ush_process *executing;
+
+    /* builtin commands vector */
+    struct ush_executable *builtins;
 
     /* user provided commands vector */
     struct ush_executable *commands;
