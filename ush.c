@@ -64,6 +64,7 @@ ush_destroy(struct ush *sh) {
 
 struct ush_executable*
 ush_exec_find(struct ush *sh, const char *name) {
+    // TODO: implement
     return NULL;
 }
 

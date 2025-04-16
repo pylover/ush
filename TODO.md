@@ -1,3 +1,4 @@
+- all todos
 - vi: f
 - implement tab key
 - optimize some printfs with write(2)
