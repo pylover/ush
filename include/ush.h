@@ -12,6 +12,7 @@ typedef struct ush ush_t;
 #undef UAIO_ENTITY
 #define UAIO_ENTITY ush
 #include <uaio_generic.h>
+#define USH_AWAIT(task, coro, t) UAIO_AWAIT(task, ush, coro, t)
 
 
 typedef struct ush_process ush_process_t;
@@ -20,19 +21,20 @@ typedef struct ush_process ush_process_t;
 #undef UAIO_ENTITY
 #define UAIO_ENTITY ush_process
 #include <uaio_generic.h>
+#define PROCESS_AWAIT(task, coro, t) UAIO_AWAIT(task, ush_process, coro, t)
 
 
 struct ush_process {
+    struct term *term;
     char *buff;
     int argc;
     char **argv;
-    ush_process_coro_t entrypoint;
 };
 
 
 struct ush_executable {
     const char *name;
-    ush_process_coro_t entrypoint;
+    ush_process_coro_t main;
 };
 
 

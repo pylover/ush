@@ -6,7 +6,7 @@
 
 
 struct ush_process *
-process_create(struct ush *sh, struct cmd *cmd);
+process_create(struct ush *sh, const char *cmd, size_t cmdlen);
 
 
 void

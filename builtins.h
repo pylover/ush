@@ -5,7 +5,7 @@
 #include "ush.h"
 
 
-extern struct ush_executable builtin_free;
+extern const struct ush_executable builtin_free;
 
 
 ASYNC

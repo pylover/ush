@@ -4,6 +4,7 @@
 #include <elog.h>
 
 #include "config.h"
+#include "builtins.h"
 #include "ush.h"
 #include "process.h"
 #include "ush_.h"
@@ -35,7 +36,7 @@ ush_create(struct euart_device *console, struct ush_executable commands[]) {
     }
 
     sh->commands = commands;
-    sh->executing = NULL;
+    sh->subprocess = NULL;;
     return sh;
 
 failed:
@@ -53,8 +54,9 @@ ush_destroy(struct ush *sh) {
         return -1;
     }
 
-    process_free(sh->executing);
-    sh->executing = NULL;
+    if (sh->subprocess) {
+        process_free(sh->subprocess);
+    }
     ret |= term_deinit(&sh->term);
 
     free(sh);
@@ -62,37 +64,71 @@ ush_destroy(struct ush *sh) {
 }
 
 
-struct ush_executable*
-ush_exec_find(struct ush *sh, const char *name) {
-    // TODO: implement
+static const struct ush_executable*
+_exec_find(struct ush *sh, const char *name) {
+    /* look at builtins */
+    if (!strcmp(name, builtin_free.name)) {
+        return &builtin_free;
+    }
     return NULL;
+}
+
+
+static ASYNC
+_subprocessA(struct uaio_task *self, struct ush *sh) {
+    const struct ush_executable *maincoro;
+    struct ush_process *p;
+    struct cmd *cmd;
+    // ush_process_coro_t mainfunc;
+    UAIO_BEGIN(self);
+
+    /* get the terminal command line */
+    cmd = TERM_CMDLINE(&sh->term);
+
+    /* create and allocate a process */
+    p = process_create(sh, cmd->buff, cmd->len);
+    if (p == NULL) {
+        UAIO_THROW(self);
+    }
+    DEBUG("new process: %s", p->buff);
+
+    /* find entrypoint (main function) */
+    maincoro = _exec_find(sh, p->argv[0]);
+    if (maincoro == NULL) {
+        term_printf(&sh->term, "Command '%s' not found%s", p->argv[0],
+                LINEBREAK);
+        process_free(p);
+        UAIO_THROW(self);
+    }
+    sh->subprocess = p;
+
+    // TODO: execute the process
+    for (int i = 0; i < p->argc; i++) {
+        DEBUG("[%d] %s", i, p->argv[i]);
+    }
+    PROCESS_AWAIT(self, maincoro->main, p);
+
+    UAIO_FINALLY(self);
+    if (sh->subprocess) {
+        process_free(sh->subprocess);
+        sh->subprocess = NULL;
+    }
 }
 
 
 ASYNC
 ushA(struct uaio_task *self, struct ush *sh) {
-    struct term *term = &sh->term;
-    struct ush_process *p;
     UAIO_BEGIN(self);
 
     /* loop */
     while (true) {
-        TERM_AREADLINE(self, term);
+        TERM_AREADLINE(self, &sh->term);
         if (UAIO_HASERROR(self)) {
             ERROR("term read error");
             continue;
         }
-        p = process_create(sh, TERM_CMDLINE(term));
-        if (p == NULL) {
-            continue;
-        }
-        DEBUG("new process: %s", p->buff);
-        sh->executing = p;
-        // TODO: execute the process
-        for (int i = 0; i < p->argc; i++) {
-            DEBUG("[%d] %s", i, p->argv[i]);
-        }
-        process_free(sh->executing);
+
+        USH_AWAIT(self, _subprocessA, sh);
     }
 
     /* termination */

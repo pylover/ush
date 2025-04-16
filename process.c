@@ -6,7 +6,6 @@
 #include "config.h"
 #include "ush_.h"
 #include "term.h"
-#include "cmd.h"
 #include "process.h"
 
 
@@ -48,48 +47,37 @@ _tokenize(struct ush_process *p) {
 
 
 struct ush_process *
-process_create(struct ush *sh, struct cmd *cmd) {
+process_create(struct ush *sh, const char *cmd, size_t cmdlen) {
     char *b;
     struct ush_process *p;
-    struct ush_executable *exe;
 
     p = malloc(sizeof(struct ush_process));
     if (p == NULL) {
         return NULL;
     }
 
-    b = malloc(cmd->len + 1);
+    b = malloc(cmdlen + 1);
     if (b == NULL) {
         free(p);
         return NULL;
     }
-    memcpy(b, cmd->buff, cmd->len);
-    b[cmd->len] = 0;
-    p->buff = b;
 
+    memcpy(b, cmd, cmdlen);
+    b[cmdlen] = 0;
+    p->buff = b;
     if (_tokenize(p)) {
         free(b);
         free(p);
         return NULL;
     }
 
-    /* find entrypoint */
     if (p->argv == NULL) {
         free(b);
         free(p);
         return NULL;
     }
 
-    exe = ush_exec_find(sh, p->argv[0]);
-    if (exe == NULL) {
-        term_printf(&sh->term, "Command '%s' not found%s", p->argv[0],
-                LINEBREAK);
-        free(p->argv);
-        free(b);
-        free(p);
-        return NULL;
-    }
-
+    p->term = &sh->term;
     return p;
 }
 

@@ -1,15 +1,17 @@
 #include "ush.h"
+#include "term.h"
 #include "builtins.h"
 
 
 ASYNC
 freeA(struct uaio_task *self, struct ush_process *p) {
     UAIO_BEGIN(self);
+    term_printf(p->term, "free memory: %u\n", esp_get_free_heap_size());
     UAIO_FINALLY(self);
 }
 
 
-struct ush_executable builtin_free = {
+const struct ush_executable builtin_free = {
     .name = "free",
-    .entrypoint = freeA,
+    .main = freeA,
 };
