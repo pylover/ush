@@ -63,7 +63,7 @@ done:
 
 static int
 _prompt(struct term *term) {
-    if (term_printf(term, "%s%s:# ", ANSI_RESET, CONFIG_USH_PROMPT) == -1) {
+    if (TERM_PRINTF(term, "%s%s:# ", ANSI_RESET, CONFIG_USH_PROMPT) == -1) {
         return -1;
     }
 
@@ -136,18 +136,6 @@ term_deinit(struct term *term) {
 }
 
 
-int
-term_printf(struct term *term, const char *restrict fmt, ...) {
-    int ret;
-    va_list args;
-
-    va_start(args, fmt);
-    ret = vdprintf(term->outfd, fmt, args);
-    va_end(args);
-    return ret;
-}
-
-
 void
 term_cursor_move(struct term *term, int cols) {
     int newcol = term->col + cols;
@@ -172,7 +160,7 @@ term_cursor_move(struct term *term, int cols) {
         return;
     }
 
-    term_printf(term, "%c[%d%c", ASCII_ESC, abs(steps), steps < 0? 'D': 'C');
+    TERM_PRINTF(term, "%c[%d%c", ASCII_ESC, abs(steps), steps < 0? 'D': 'C');
     term->col = newcol;
 }
 
@@ -197,7 +185,7 @@ term_insert(struct term *term, char c) {
     dirty = cmd->len - term->col;
     if (dirty) {
         write(term->outfd, cmd_ptroff(cmd, term->col), dirty);
-        term_printf(term, "%c[%dD", ASCII_ESC, abs(dirty));
+        TERM_PRINTF(term, "%c[%dD", ASCII_ESC, abs(dirty));
     }
 
     return 0;
@@ -215,7 +203,7 @@ term_rewrite(struct term *term, int index) {
         term_cursor_move(term, index - term->col);
     }
 
-    term_printf(term, "%s%.*s", ANSI_ERASETOEND, (cmd->len - index),
+    TERM_PRINTF(term, "%s%.*s", ANSI_ERASETOEND, (cmd->len - index),
             cmd_ptroff(cmd, index));
     term->col = cmd->len;
 }
@@ -368,7 +356,7 @@ prompt:
             /* enter */
             if (c == ASCII_LF) {
                 cmd = TERM_CMDLINE(term);
-                term_printf(term, LINEBREAK);
+                TERM_PRINTF(term, LINEBREAK);
                 if (cmd->len == 0) {
                     goto prompt;
                 }

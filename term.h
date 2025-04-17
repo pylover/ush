@@ -37,6 +37,7 @@ typedef struct term {
 #include "uaio_generic.h"
 
 
+#define TERM_PRINTF(t, ...) dprintf((t)->outfd, __VA_ARGS__)
 #define TERM_AWAIT(task, coro, t) UAIO_AWAIT(task, term, coro, t)
 #define TERM_AREADLINE(task, t) TERM_AWAIT(task, term_readA, t)
 #define TERM_INBUFF_COUNT(t) ERING_USED(&(t)->reader.ring)
@@ -58,10 +59,6 @@ term_init(struct term *term, int infd, int outfd);
 
 int
 term_deinit(struct term *term);
-
-
-int
-term_printf(struct term *term, const char *restrict fmt, ...);
 
 
 void

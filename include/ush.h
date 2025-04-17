@@ -46,6 +46,10 @@ int
 ush_destroy(struct ush *sh);
 
 
+int
+ush_printf(struct ush_process *p, const char *restrict fmt, ...);
+
+
 ASYNC
 ushA(struct uaio_task *self, struct ush *sh);
 

@@ -64,11 +64,34 @@ ush_destroy(struct ush *sh) {
 }
 
 
+int
+ush_printf(struct ush_process *p, const char *restrict fmt, ...) {
+    int ret;
+    va_list args;
+
+    va_start(args, fmt);
+    ret = vdprintf(p->term->outfd, fmt, args);
+    va_end(args);
+    return ret;
+}
+
+
 static const struct ush_executable*
 _exec_find(struct ush *sh, const char *name) {
+    struct ush_executable *e;
+
     /* look at builtins */
     if (!strcmp(name, builtin_free.name)) {
         return &builtin_free;
+    }
+
+
+    e = sh->commands;
+    while (e && e->name) {
+        if (!strcmp(name, e->name)) {
+            return e;
+        }
+        e++;
     }
     return NULL;
 }
@@ -79,7 +102,6 @@ _subprocessA(struct uaio_task *self, struct ush *sh) {
     const struct ush_executable *maincoro;
     struct ush_process *p;
     struct cmd *cmd;
-    // ush_process_coro_t mainfunc;
     UAIO_BEGIN(self);
 
     /* get the terminal command line */
@@ -95,17 +117,14 @@ _subprocessA(struct uaio_task *self, struct ush *sh) {
     /* find entrypoint (main function) */
     maincoro = _exec_find(sh, p->argv[0]);
     if (maincoro == NULL) {
-        term_printf(&sh->term, "Command '%s' not found%s", p->argv[0],
+        TERM_PRINTF(&sh->term, "Command '%s' not found%s", p->argv[0],
                 LINEBREAK);
         process_free(p);
         UAIO_THROW(self);
     }
     sh->subprocess = p;
 
-    // TODO: execute the process
-    for (int i = 0; i < p->argc; i++) {
-        DEBUG("[%d] %s", i, p->argv[i]);
-    }
+    /* execute */
     PROCESS_AWAIT(self, maincoro->main, p);
 
     UAIO_FINALLY(self);

@@ -1,4 +1,3 @@
-- all todos
 - vi: f
 - implement tab key
 - optimize some printfs with write(2)
@@ -6,7 +5,3 @@
 - lint
 - segment commands using ;
 - queue commands using && and ||
-
-
-0x3fc9ce2c
-  0x3fc9d43c
