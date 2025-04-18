@@ -78,6 +78,7 @@ process_create(struct ush *sh, const char *cmd, size_t cmdlen) {
     }
 
     p->term = &sh->term;
+    p->userptr = NULL;
     return p;
 }
 

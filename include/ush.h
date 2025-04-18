@@ -27,6 +27,7 @@ typedef struct ush_process ush_process_t;
 struct ush_process {
     struct term *term;
     char *buff;
+    void *userptr;
     int argc;
     char **argv;
 };
