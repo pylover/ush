@@ -127,17 +127,12 @@ vi_init(struct vi *vi, struct term *term) {
 
 void
 vi_swmode(struct vi *vi, enum vi_mode mode) {
-    int col;
-
     if (vi->mode == mode) {
         return;
     }
 
-    col = vi->term->col;
-    DEBUG("VI: Switched to %s mode, col: %d",
-            mode == VI_INSERT? "insert": "normal", col);
     vi->mode = mode;
-    if ((mode == VI_NORMAL) && col) {
+    if ((mode == VI_NORMAL) && vi->term->col) {
         term_cursor_move(vi->term, -1);
     }
 }

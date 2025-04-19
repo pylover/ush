@@ -115,7 +115,6 @@ _subprocessA(struct uaio_task *self, struct ush *sh) {
     if (p == NULL) {
         UAIO_THROW(self);
     }
-    DEBUG("new process: %s", p->buff);
 
     /* find entrypoint (main function) */
     maincoro = _exec_find(sh, p->argv[0]);
