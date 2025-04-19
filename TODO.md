@@ -1,4 +1,4 @@
-- vi: f
+- vi: f, r
 - implement tab key
 - optimize some printfs with write(2)
 - banner
