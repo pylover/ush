@@ -85,6 +85,9 @@ _exec_find(struct ush *sh, const char *name) {
         return &builtin_free;
     }
 
+    if (!strcmp(name, builtin_iodump.name)) {
+        return &builtin_iodump;
+    }
 
     e = sh->commands;
     while (e && e->name) {

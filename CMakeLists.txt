@@ -18,7 +18,7 @@ endif()
 idf_component_register(
   SRCS "${sources}"
   INCLUDE_DIRS "include"
-  REQUIRES euart ering
+  REQUIRES euart ering esp_driver_gpio
 )
 
 
