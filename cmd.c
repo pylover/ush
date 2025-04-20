@@ -134,6 +134,18 @@ cmd_insert(struct cmd *c, char ch, int index) {
 
 
 int
+cmd_set(struct cmd *c, char ch, int index) {
+    /* backup */
+    if (_backup(c)) {
+        return -1;
+    }
+
+    c->buff[index] = ch;
+    return 0;
+}
+
+
+int
 cmd_delete(struct cmd *c, int index, int count) {
     int toindex;
     int i;

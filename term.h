@@ -69,6 +69,10 @@ int
 term_insert(struct term *term, char c);
 
 
+int
+term_set(struct term *term, char c);
+
+
 void
 term_rewrite(struct term *term, int index);
 

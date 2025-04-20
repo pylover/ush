@@ -192,6 +192,20 @@ term_insert(struct term *term, char c) {
 }
 
 
+int
+term_set(struct term *term, char c) {
+    struct cmd *cmd = TERM_CMDLINE(term);
+
+    if (cmd_set(cmd, c, term->col)) {
+        return -1;
+    }
+
+    write(term->outfd, cmd_ptroff(cmd, term->col), 1);
+    write(term->outfd, "\33[1D", 4);
+    return 0;
+}
+
+
 void
 term_rewrite(struct term *term, int index) {
     struct cmd *cmd = TERM_CMDLINE(term);

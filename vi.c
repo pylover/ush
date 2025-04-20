@@ -181,7 +181,7 @@ aread:
         if (TERM_INBUFF_COUNT(term) < 1) {
             EUART_AREAD(self, &term->reader, 1);
         }
-        c = TERM_INBUFF_GET(term);
+        c = TERM_INBUFF_POP(term);
         if (c == '$') {
             term_delete(term, cmdline->len);
         }
@@ -192,6 +192,15 @@ aread:
             term_cursor_move(term, -term->col);
             term_delete(term, cmdline->len);
         }
+        UAIO_RETURN(self);
+    }
+
+    if (c == 'r') {
+        if (TERM_INBUFF_COUNT(term) < 1) {
+            EUART_AREAD(self, &term->reader, 1);
+        }
+        c = TERM_INBUFF_POP(term);
+        term_set(term, c);
         UAIO_RETURN(self);
     }
 

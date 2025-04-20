@@ -43,6 +43,10 @@ int
 cmd_insert(struct cmd *c, char ch, int index);
 
 
+int
+cmd_set(struct cmd *c, char ch, int index);
+
+
 /** Deletes one or more characters.
  *
  * if index is less than zero, then the index is enumerated from the end of the
